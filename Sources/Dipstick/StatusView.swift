@@ -76,6 +76,17 @@ struct StatusView: View {
                     .foregroundStyle(.secondary)
             }
             Spacer()
+            if let update = model.availableUpdate {
+                Button {
+                    Task { await model.checkForUpdates() }
+                } label: {
+                    Label("Dipstick \(update.version)", systemImage: "arrow.down.circle.fill")
+                }
+                .help("A newer Dipstick is out: download it or read its release notes")
+            } else {
+                Button("Check for Updates…") { Task { await model.checkForUpdates() } }
+                    .help("Ask GitHub for a Dipstick newer than \(UpdateChecker.installedVersion)")
+            }
             Button("mrk-menu") { model.runInTerminal("mrk-menu", confirm: false) }
                 .help("Open the mrk-menu launcher in a terminal")
             Button("Quit") { NSApplication.shared.terminate(nil) }

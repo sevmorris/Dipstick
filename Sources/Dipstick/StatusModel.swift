@@ -10,6 +10,8 @@ final class StatusModel {
     private(set) var error: StatusError?
     private(set) var isRefreshing = false
     private(set) var lastRefreshed: Date?
+    /// A newer Dipstick, found by the quiet check. The footer offers it.
+    private(set) var availableUpdate: AvailableUpdate?
 
     let home: String
     private var environment: [String: String]?
@@ -20,6 +22,10 @@ final class StatusModel {
     static let interval: Duration = .seconds(30 * 60)
     /// Opening the menu refreshes a report older than this.
     static let staleAfter: TimeInterval = 120
+    /// The quiet update check runs at launch and then this often. A menu bar
+    /// app runs from login to shutdown, so a check at launch alone could be
+    /// weeks old.
+    static let updateInterval: Duration = .seconds(24 * 60 * 60)
 
     init(home: String = NSHomeDirectory()) {
         self.home = home
@@ -50,6 +56,12 @@ final class StatusModel {
             while true {
                 await refresh()
                 try? await Task.sleep(for: Self.interval)
+            }
+        }
+        Task {
+            while true {
+                await checkForUpdates(quietly: true)
+                try? await Task.sleep(for: Self.updateInterval)
             }
         }
     }
@@ -108,6 +120,60 @@ final class StatusModel {
             try TerminalLauncher.run(command: command, directory: repoRoot, exports: exports)
         } catch {
             let alert = NSAlert(error: error)
+            alert.runModal()
+        }
+    }
+
+    /// Asks GitHub for a newer Dipstick. Check for Updates… says what it found
+    /// in an alert. The quiet check at launch and each day after says nothing:
+    /// it only sets availableUpdate for the footer, since an alert from a menu
+    /// bar app at login would land on top of whatever else was opening.
+    func checkForUpdates(quietly: Bool = false) async {
+        let result = await UpdateChecker.shared.check()
+
+        switch result {
+        case .available(let update):
+            availableUpdate = update
+        case .upToDate, .needsNewerMacOS:
+            availableUpdate = nil
+        case .error:
+            // A failed check says nothing about what was found before.
+            break
+        }
+        guard !quietly else { return }
+
+        NSApp.activate()
+        let alert = NSAlert()
+        switch result {
+        case .upToDate(let version):
+            alert.messageText = "You're up to date"
+            alert.informativeText = "Dipstick \(version) is the latest version."
+            alert.addButton(withTitle: "OK")
+            alert.runModal()
+
+        case .available(let update):
+            alert.messageText = "Update Available"
+            alert.informativeText = "Dipstick \(update.version) is available. You have \(UpdateChecker.installedVersion)."
+            alert.addButton(withTitle: "Download")
+            alert.addButton(withTitle: "Release Notes")
+            alert.addButton(withTitle: "Not Now")
+            switch alert.runModal() {
+            case .alertFirstButtonReturn: NSWorkspace.shared.open(update.downloadURL)
+            case .alertSecondButtonReturn: NSWorkspace.shared.open(update.releaseURL)
+            default: break
+            }
+
+        case .needsNewerMacOS(let version, let minimum, let installed):
+            alert.messageText = "Dipstick \(version) needs macOS \(minimum)"
+            alert.informativeText = "This Mac has macOS \(UpdateChecker.describe(ProcessInfo.processInfo.operatingSystemVersion)), "
+                + "so Dipstick \(installed) is the newest version it can run."
+            alert.addButton(withTitle: "OK")
+            alert.runModal()
+
+        case .error(let message):
+            alert.messageText = "Update Check Failed"
+            alert.informativeText = message
+            alert.addButton(withTitle: "OK")
             alert.runModal()
         }
     }

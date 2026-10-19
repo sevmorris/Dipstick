@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!--
+        Entitlements for the Developer ID signature, which uses the hardened
+        runtime (required for notarization).
+
+        The app is not sandboxed, and cannot be: it runs mrk-status and a login
+        shell, reads ~/mrk, and opens .command files that run fixes in it. So
+        the network entitlement below is declarative rather than load-bearing:
+        an unsandboxed process may make outgoing connections regardless. It is
+        recorded here because the update check is the app's one connection.
+    -->
+
+    <!-- Outgoing HTTPS: update checks against api.github.com -->
+    <key>com.apple.security.network.client</key>
+    <true/>
+
+    <!-- Deliberately not requested: no JIT, no unsigned executable memory, no
+         library validation exemption, no Apple Events. The processes Dipstick
+         starts are their own programs with their own signatures; the hardened
+         runtime constrains Dipstick, not them. -->
+</dict>
+</plist>
