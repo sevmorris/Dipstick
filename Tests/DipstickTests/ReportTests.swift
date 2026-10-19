@@ -76,4 +76,70 @@ final class ReportTests: XCTestCase {
         XCTAssertTrue(detail.trimmedText.hasPrefix("offered, and never installed"))
         XCTAssertEqual(report.panels[1].lines[0].indent, 0)
     }
+
+    // MARK: - Problems
+
+    func testProblemsAreTheLinesThatWarnOrErrInTheReportsOrder() throws {
+        let report = try StatusReport.decode(Data(sampleReport.utf8))
+        let problems = report.problems
+        XCTAssertEqual(problems.map(\.name), ["Unrecorded", "Time Machine Backups"])
+        XCTAssertEqual(problems[0].lines.map(\.text),
+                       ["2 packages installed, not in the Brewfile: jq, nasm"])
+        XCTAssertEqual(problems[0].lines[0].fix, "make sync ARGS=-c")
+        XCTAssertEqual(problems[1].lines.map(\.severity), [.error])
+        // Each panel keeps its name and severity, cut down to its problems.
+        XCTAssertEqual(problems[0].severity, .warn)
+        XCTAssertEqual(problems[1].severity, .error)
+    }
+
+    func testAnAllClearReportHasNoProblems() {
+        let report = StatusReport(schema: 1, severity: .ok, summary: "all clear", panels: [
+            Panel(name: "Upkeep", severity: .ok, fix: "", lines: [
+                Line(severity: .ok, text: "No macOS update for macOS 26", fix: ""),
+                Line(severity: .info, text: "  offered, and never installed by mrk, being a major upgrade: macOS 27.0.1", fix: ""),
+            ]),
+            Panel(name: "Installation", severity: .ok, fix: "", lines: []),
+        ])
+        XCTAssertEqual(report.problems, [])
+    }
+
+    func testAProblemKeepsTheDetailLinesUnderIt() {
+        // As the Unrecorded and Installation panels write them: a line that
+        // warns or errs, then its details, indented, whatever their severity.
+        let report = StatusReport(schema: 1, severity: .error, summary: "1 error, 1 warning", panels: [
+            Panel(name: "Unrecorded", severity: .warn, fix: "bin/pushall", lines: [
+                Line(severity: .ok, text: "~/mrk: committed and pushed", fix: ""),
+                Line(severity: .info, text: "  1 untracked file, which mrk-push never commits", fix: ""),
+                Line(severity: .warn, text: "~/Projects: 1 repository with uncommitted changes: Dipstick", fix: "bin/pushall"),
+                Line(severity: .info, text: "  no upstream, so pushall skips them: Dipstick", fix: ""),
+                Line(severity: .ok, text: "The manifest records every repository in ~/Projects", fix: ""),
+            ]),
+            Panel(name: "Installation", severity: .error, fix: "make build-tools", lines: [
+                Line(severity: .warn, text: "Tools — Not built: mrk-status", fix: "make build-tools"),
+                Line(severity: .warn, text: "  Older than their source: picker", fix: ""),
+                Line(severity: .info, text: "    rebuilt by make build-tools", fix: ""),
+                Line(severity: .ok, text: "Dotfiles — all linked", fix: ""),
+                Line(severity: .error, text: "Defaults — 1 key unreadable", fix: ""),
+            ]),
+        ])
+        let problems = report.problems
+        XCTAssertEqual(problems.map(\.name), ["Unrecorded", "Installation"])
+        XCTAssertEqual(problems[0].lines.map(\.text), [
+            "~/Projects: 1 repository with uncommitted changes: Dipstick",
+            "  no upstream, so pushall skips them: Dipstick",
+        ])
+        XCTAssertEqual(problems[1].lines.map(\.text), [
+            "Tools — Not built: mrk-status",
+            "  Older than their source: picker",
+            "    rebuilt by make build-tools",
+            "Defaults — 1 key unreadable",
+        ])
+    }
+
+    func testAnUnknownSeverityIsNotAProblem() throws {
+        // It reads as .info, so a newer mrk-status's new word stays out of the
+        // list instead of raising an alarm this build cannot explain.
+        let json = #"{"schema":1,"severity":"warn","summary":"x","panels":[{"name":"P","severity":"warn","fix":"","lines":[{"severity":"catastrophic","text":"t","fix":""}]}]}"#
+        XCTAssertEqual(try StatusReport.decode(Data(json.utf8)).problems, [])
+    }
 }

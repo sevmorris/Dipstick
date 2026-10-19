@@ -1,7 +1,7 @@
 import SwiftUI
 
-/// The window under the menu bar icon: the verdict, the four panels, and a
-/// Run button beside every fix.
+/// The window under the menu bar icon: the verdict, each warning and error,
+/// the four panels, and a Run button beside every fix.
 struct StatusView: View {
     let model: StatusModel
 
@@ -14,19 +14,7 @@ struct StatusView: View {
                 Divider()
             }
             if let report = model.report {
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 10) {
-                        if report.schema > StatusReport.supportedSchema {
-                            Text("This mrk-status writes schema \(report.schema); Dipstick reads \(StatusReport.supportedSchema). Some lines may be missing.")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                        ForEach(report.panels) { panel in
-                            PanelSection(panel: panel, model: model)
-                        }
-                    }
-                    .padding(12)
-                }
+                ReportList(report: report, model: model)
             } else if model.error == nil {
                 ProgressView("Running mrk-status…")
                     .controlSize(.small)
@@ -36,7 +24,6 @@ struct StatusView: View {
             footer
         }
         .frame(width: 440)
-        .frame(maxHeight: 600)
         .onAppear { model.refreshIfStale() }
     }
 
@@ -118,17 +105,76 @@ private struct ErrorBanner: View {
     }
 }
 
+/// The report: what is wrong first, then the four panels. One list that is as
+/// tall as what it holds, up to maxHeight, and scrolls past that.
+private struct ReportList: View {
+    let report: StatusReport
+    let model: StatusModel
+    /// The height of the list's content, as last laid out.
+    @State private var contentHeight: CGFloat = 0
+
+    /// Room for a day's few problems and the four panels, closed. A longer
+    /// list scrolls, and the window stays well clear of the bottom of a
+    /// laptop's screen.
+    static let maxHeight: CGFloat = 520
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 12) {
+                if report.schema > StatusReport.supportedSchema {
+                    Text("This mrk-status writes schema \(report.schema); Dipstick reads \(StatusReport.supportedSchema). Some lines may be missing.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                let problems = report.problems
+                if !problems.isEmpty {
+                    VStack(alignment: .leading, spacing: 10) {
+                        ForEach(problems) { panel in
+                            ProblemGroup(panel: panel, model: model)
+                        }
+                    }
+                    Divider()
+                }
+                VStack(alignment: .leading, spacing: 10) {
+                    ForEach(report.panels) { panel in
+                        PanelSection(panel: panel, model: model)
+                    }
+                }
+            }
+            .padding(12)
+            .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { contentHeight = $0 }
+        }
+        // The menu bar window is as tall as its content asks to be, and a
+        // ScrollView asks for no height at all: alone, it gets 0 pt, which
+        // is how v0.1 showed the verdict and none of the panels. So the list
+        // asks for the height of what it holds, up to the cap.
+        .frame(height: min(contentHeight.rounded(.up), Self.maxHeight))
+    }
+}
+
+/// One panel's warnings and errors, under the panel's name.
+private struct ProblemGroup: View {
+    let panel: Panel
+    let model: StatusModel
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(panel.name)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+            ForEach(Array(panel.lines.enumerated()), id: \.offset) { _, line in
+                LineRow(line: line, model: model)
+            }
+        }
+    }
+}
+
+/// A panel and all its lines, closed until clicked: its warnings and errors
+/// are already listed above it, fix and all.
 private struct PanelSection: View {
     let panel: Panel
     let model: StatusModel
-    @State private var expanded: Bool
-
-    init(panel: Panel, model: StatusModel) {
-        self.panel = panel
-        self.model = model
-        // A panel with something to say opens by itself.
-        _expanded = State(initialValue: panel.severity == .warn || panel.severity == .error)
-    }
+    @State private var expanded = false
 
     var body: some View {
         DisclosureGroup(isExpanded: $expanded) {
@@ -144,10 +190,6 @@ private struct PanelSection: View {
             HStack(spacing: 6) {
                 SeverityIcon(severity: panel.severity)
                 Text(panel.name).fontWeight(.semibold)
-                Spacer()
-                if !panel.fix.isEmpty {
-                    FixButton(command: panel.fix, model: model)
-                }
             }
         }
     }

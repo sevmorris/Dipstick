@@ -12,9 +12,11 @@ enum Snapshot {
         return arguments[flag + 1]
     }
 
-    /// The window's content is drawn by AppKit controls (buttons, disclosure
-    /// triangles), which ImageRenderer leaves as placeholders, so the view is
-    /// hosted in an off-screen window and cached from there.
+    /// The picture is of the menu bar window itself: the snapshot clicks the
+    /// icon, as a person does, and draws the window that opens. A view hosted
+    /// apart from it is laid out differently. v0.1's snapshots hosted
+    /// StatusView in an NSHostingView sized by its fittingSize, and showed
+    /// every panel, while the menu bar window gave the panels 0 pt.
     @MainActor
     static func write(model: StatusModel, to path: String) async -> Bool {
         await model.refresh()
@@ -22,19 +24,48 @@ enum Snapshot {
             FileHandle.standardError.write(Data("dipstick: \(error.message)\n".utf8))
         }
 
-        let host = NSHostingView(rootView: StatusView(model: model)
-            .background(Color(nsColor: .windowBackgroundColor)))
-        host.frame = NSRect(origin: .zero, size: host.fittingSize)
-        let window = NSWindow(contentRect: host.frame, styleMask: .borderless,
-                              backing: .buffered, defer: false)
-        window.contentView = host
-        host.layoutSubtreeIfNeeded()
-        // One pass of the run loop, for SwiftUI to finish its first layout.
-        try? await Task.sleep(for: .milliseconds(300))
+        guard let window = await openMenuBarWindow(), let view = window.contentView else {
+            FileHandle.standardError.write(Data("dipstick: the menu bar window did not open\n".utf8))
+            return false
+        }
+        // SwiftUI sizes the list in a second pass, once it has measured what
+        // the list holds, so wait until the window keeps one size for 0.3 s.
+        var size = window.frame.size
+        var steady = 0
+        for _ in 0..<30 {
+            try? await Task.sleep(for: .milliseconds(100))
+            steady = window.frame.size == size ? steady + 1 : 0
+            size = window.frame.size
+            if steady == 3 { break }
+        }
 
-        guard let rep = host.bitmapImageRepForCachingDisplay(in: host.bounds) else { return false }
-        host.cacheDisplay(in: host.bounds, to: rep)
-        guard let png = rep.representation(using: .png, properties: [:]) else { return false }
-        return (try? png.write(to: URL(fileURLWithPath: path))) != nil
+        guard let rep = view.bitmapImageRepForCachingDisplay(in: view.bounds) else { return false }
+        view.cacheDisplay(in: view.bounds, to: rep)
+        guard let png = rep.representation(using: .png, properties: [:]),
+              (try? png.write(to: URL(fileURLWithPath: path))) != nil else { return false }
+        FileHandle.standardError.write(Data("dipstick: wrote \(path), \(Int(size.width))×\(Int(size.height)) pt\n".utf8))
+        return true
+    }
+
+    /// Clicks Dipstick's menu bar icon and returns the window it opens.
+    @MainActor
+    private static func openMenuBarWindow() async -> NSWindow? {
+        guard let button = NSApp.windows.lazy.compactMap({ statusButton(in: $0.contentView) }).first
+        else { return nil }
+        button.performClick(nil)
+        for _ in 0..<30 {
+            if let window = NSApp.windows.first(where: { $0.isVisible && $0 !== button.window }) {
+                return window
+            }
+            try? await Task.sleep(for: .milliseconds(100))
+        }
+        return nil
+    }
+
+    @MainActor
+    private static func statusButton(in view: NSView?) -> NSStatusBarButton? {
+        guard let view else { return nil }
+        if let button = view as? NSStatusBarButton { return button }
+        return view.subviews.lazy.compactMap { statusButton(in: $0) }.first
     }
 }
