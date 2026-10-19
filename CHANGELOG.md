@@ -4,7 +4,16 @@ All notable changes to Dipstick are documented here. Every released version has 
 
 Write a version's entry before releasing it, and put the same prose in `release-notes/v<version>.md`: `release.sh` publishes that file as the release's notes, and stops before building anything when it is absent.
 
-## [0.1] — unreleased
+## [Unreleased]
+
+**Fixed**
+- **The window shows the panels.** In 0.1 the window under the menu bar icon showed the verdict and the footer, and nothing between them. The menu bar window is as tall as its content asks to be, and the list of panels, a scroll view, asked for no height, so it got none. The list is now as tall as what it holds, up to 520 points, and scrolls past that.
+
+**Changed**
+- **Each warning and error is listed under the verdict.** Each one is under the name of its panel, with its detail lines and its fix button, so what is wrong shows without opening a panel. The four panels follow, closed. Their headers no longer show a fix button, because the list above already shows each fix.
+- **`--snapshot` draws the menu bar window itself.** It opens the window as a click on the icon does, and saves what the window shows, at the size the menu bar gives it. In 0.1 it drew the view in a separate window, sized by its own measurement, and that window showed the panels when the menu bar window did not.
+
+## [0.1] — 2026-10-18
 
 The first release.
 

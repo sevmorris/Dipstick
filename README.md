@@ -14,8 +14,12 @@ The icon shows the worst result:
 | ✗ octagon | At least one error |
 | ? circle | `mrk-status` did not run, or gave no report |
 
-Click the icon to open the panels. A panel with a warning or an error opens by
-itself. Each fix is a button that shows the command it runs. The button opens a
+Click the icon to open the window. Under the verdict, the window lists each
+warning and error, under the name of its panel, with its detail lines and its
+fix. Below that are the four panels, closed. Click a panel to see all its
+lines. When the list is taller than the window can be, it scrolls.
+
+Each fix is a button that shows the command it runs. The button opens a
 terminal and runs the command in `~/mrk`, the same way the `f` key does in
 `mrk-status`. Most fixes need a terminal: `make sync ARGS=-c` opens the picker,
 and `sudo` asks for a password.
@@ -78,8 +82,11 @@ the variable set:
 DIPSTICK_MRK_STATUS=/path/to/mrk-status build/Dipstick.app/Contents/MacOS/Dipstick
 ```
 
-To see the window without opening the menu bar, write it to a PNG.
-Dipstick runs one refresh, saves the image, and quits:
+To write the window to a PNG, use `--snapshot`. Dipstick runs one refresh,
+opens the window under its icon as a click does, saves the image, and quits.
+The window is on screen for about a second. The image is of the menu bar
+window itself, at the size the menu bar gives it, and Dipstick prints that
+size in points:
 
 ```bash
 build/Dipstick.app/Contents/MacOS/Dipstick --snapshot ~/Desktop/dipstick.png
