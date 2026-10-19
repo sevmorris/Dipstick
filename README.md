@@ -51,8 +51,10 @@ result, so the dashboard and the menu bar always agree.
   you, and when a newer version is out, the footer names it in place of the
   button. A version that needs a newer macOS than this Mac has is not offered.
 
-Dipstick keeps no settings and writes nothing but the `.command` files. The
-update check is its one network request.
+Dipstick stores no settings of its own. AppKit keeps the menu bar icon's
+position in Dipstick's defaults domain, `io.github.sevmorris.Dipstick`, as it
+does for any menu bar item. Apart from that, Dipstick writes nothing but the
+`.command` files. The update check is its one network request.
 
 ## Requirements
 

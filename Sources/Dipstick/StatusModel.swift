@@ -24,7 +24,9 @@ final class StatusModel {
     static let staleAfter: TimeInterval = 120
     /// The quiet update check runs at launch and then this often. A menu bar
     /// app runs from login to shutdown, so a check at launch alone could be
-    /// weeks old.
+    /// weeks old. The schedule lives in this process: a throttle date kept in
+    /// UserDefaults would be Dipstick's first setting, and would bring the
+    /// AppLauncher guard with it (see DipstickApp).
     static let updateInterval: Duration = .seconds(24 * 60 * 60)
 
     init(home: String = NSHomeDirectory()) {

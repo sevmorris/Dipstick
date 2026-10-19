@@ -15,9 +15,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
 // MARK: - App
 
-/// Dipstick keeps nothing in UserDefaults, so a test run has no settings of
-/// the developer's to overwrite; the sibling apps' AppLauncher guard has
-/// nothing to guard here. If a setting is ever added, add the guard with it.
+/// Dipstick stores no settings of its own, but AppKit keeps the menu bar
+/// icon's position in its defaults domain: `NSStatusItem Preferred Position
+/// Item-0` in io.github.sevmorris.Dipstick, which snapshot-prefs captures.
+/// `swift test` never launches the app or creates the status item, so no test
+/// touches that domain, and the sibling apps' AppLauncher guard has nothing to
+/// guard here yet. Add it, with their `UserDefaults.app` isolation, alongside
+/// the first setting Dipstick stores itself.
 #if !TESTING
 @main
 #endif
