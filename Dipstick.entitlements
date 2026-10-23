@@ -7,7 +7,8 @@
         runtime (required for notarization).
 
         The app is not sandboxed, and cannot be: it runs mrk-status and a login
-        shell, reads ~/mrk, and opens .command files that run fixes in it. So
+        shell, reads ~/mrk, runs fixes in it in its console, and opens .command
+        files that run the rest in a terminal. So
         the network entitlement below is declarative rather than load-bearing:
         an unsandboxed process may make outgoing connections regardless. It is
         recorded here because the update check is the app's one connection.
@@ -17,9 +18,19 @@
     <key>com.apple.security.network.client</key>
     <true/>
 
+    <!-- Apple events, for make update in the console. lib.sh's
+         remove_unwanted_login_items asks System Events with osascript, and
+         macOS holds Dipstick responsible for a request from a program it
+         started, as it held Terminal responsible before 0.3. Under the
+         hardened runtime, macOS refuses Apple events from an app without this
+         entitlement and does not ask; with it, macOS asks once, showing the
+         Info.plist's NSAppleEventsUsageDescription. release.sh checks both. -->
+    <key>com.apple.security.automation.apple-events</key>
+    <true/>
+
     <!-- Deliberately not requested: no JIT, no unsigned executable memory, no
-         library validation exemption, no Apple Events. The processes Dipstick
-         starts are their own programs with their own signatures; the hardened
-         runtime constrains Dipstick, not them. -->
+         library validation exemption. The processes Dipstick starts are their
+         own programs with their own signatures; the hardened runtime
+         constrains Dipstick, not them. -->
 </dict>
 </plist>

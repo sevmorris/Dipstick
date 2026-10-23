@@ -4,6 +4,15 @@ All notable changes to Dipstick are documented here. Every released version has 
 
 Write a version's entry before releasing it, and put the same prose in `release-notes/v<version>.md`: `release.sh` publishes that file as the release's notes, and stops before building anything when it is absent.
 
+## [Unreleased]
+
+**Changed**
+- **Fixes run in Dipstick's console, not in Terminal.** Click a fix and confirm, and the command runs in a window of Dipstick's own: Gearbox's console, a phosphor screen over a terminal that Dipstick reads and types at. The command runs as before, with zsh in `~/mrk`, with the login shell's environment and `MRK_ROOT`. You answer its prompts in the console: `mrk-push`'s commit message, the secret scan before a commit, `sudo`'s password. ⌃C or ⌘. stops it: Stop sends ⌃C, then SIGTERM, then SIGKILL. When it ends, Dipstick runs `mrk-status` again, so you no longer click ↻. The button at the top right of the console picks Phosphor Green, Phosphor Amber or Plain.
+- **Three fixes still open a terminal.** `make sync ARGS=-c`, `make sync-login-items ARGS=-c` and `make brew` draw a full-screen picker (mrk-picker or `gum choose`), and the console is a dumb terminal that cannot show one. The mrk-menu button opens a terminal too.
+- **While a fix runs, its window does not close and Dipstick does not quit.** Quitting would cut the fix off, perhaps between a commit and its push. The console comes to the front instead. The fix buttons that use the console wait until it has finished, and the menu names the fix with a Show button.
+- **`make update` asks for System Events.** It removes the login items mrk keeps off, through System Events, and macOS now asks about Dipstick rather than Terminal. Dipstick carries the usage text and the entitlement for that request, so macOS asks once. Fixes in the console may also need App Management (for `brew upgrade`) or access to other apps' data (for `make snapshot-prefs` and `make defaults`).
+- **`--snapshot` also draws the console**, running `make help`, into a second PNG beside the first. It puts back any key the run wrote in Dipstick's defaults domain.
+
 ## [0.2] — 2026-10-19
 
 **Fixed**

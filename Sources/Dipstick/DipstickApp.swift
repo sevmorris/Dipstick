@@ -3,45 +3,116 @@ import AppKit
 
 let appVersion = "0.2"
 
+// MARK: - Launch
+
+/// Decides, before anything else runs, whether this launch is the app or only
+/// a host for tests, as the sibling apps' AppLauncher does.
+///
+/// `swift test` links this module into the test runner and never calls
+/// main(), so today nothing launches the app under a test. The guard came with
+/// the first setting Dipstick stores itself, the console's screen colour.
+/// AppKit keeps the menu bar icon's position in the same domain,
+/// io.github.sevmorris.Dipstick, which snapshot-prefs captures, and a test run
+/// must never touch the developer's real ones.
+#if !TESTING
+@main
+#endif
+enum AppLauncher {
+    static func main() {
+        if isHostingTests {
+            TestHostApp.main()
+        } else {
+            DipstickApp.main()
+        }
+    }
+
+    /// XCTest is already loaded when main() runs in a test host, and is never
+    /// linked into the app itself.
+    static let isHostingTests =
+        NSClassFromString("XCTestCase") != nil
+        || ProcessInfo.processInfo.environment["XCTestSessionIdentifier"] != nil
+}
+
+/// A scene with no window: while the app hosts tests, nothing of the real app
+/// is built.
+private struct TestHostApp: App {
+    var body: some Scene {
+        Settings { EmptyView() }
+    }
+}
+
+extension UserDefaults {
+    /// Where Dipstick keeps what it stores in defaults: its own domain, except
+    /// under tests and in a --snapshot run, where it is a scratch suite named
+    /// by a path in the temporary folder. A path keeps the file out of
+    /// ~/Library/Preferences, where snapshot-prefs exports every
+    /// io.github.sevmorris.* domain. Nothing in the app names `.standard`; it
+    /// goes through here. AppKit's own keys, such as the menu bar icon's
+    /// position, go to the real domain whatever this says.
+    static let app: UserDefaults = {
+        let scratch: String?
+        if AppLauncher.isHostingTests {
+            scratch = "io.github.sevmorris.Dipstick.tests"
+        } else if Snapshot.path(in: CommandLine.arguments) != nil {
+            scratch = "io.github.sevmorris.Dipstick.snapshot"
+        } else {
+            scratch = nil
+        }
+        guard let scratch else { return .standard }
+        return UserDefaults(suiteName: FileManager.default.temporaryDirectory
+            .appendingPathComponent(scratch).path)!
+    }()
+}
+
 // MARK: - App Delegate
 
+@MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
+    /// The app's one model. It lives here so that Quit can ask it whether a
+    /// fix is running.
+    let model = StatusModel()
+
     func applicationWillFinishLaunching(_ notification: Notification) {
         // A menu bar app: no Dock icon and no app menu. The built bundle says
         // so with LSUIElement; this covers `swift run`, which has no bundle.
         NSApp.setActivationPolicy(.accessory)
     }
+
+    /// A fix running in the console keeps Dipstick open, as Gearbox's console
+    /// sheet keeps Gearbox open: quitting would hang the fix up half way. The
+    /// console comes forward to say why. A logout or a restart waits too.
+    func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        guard model.isConsoleRunning else { return .terminateNow }
+        model.showConsole()
+        NSSound.beep()
+        return .terminateCancel
+    }
 }
 
 // MARK: - App
 
-/// Dipstick stores no settings of its own, but AppKit keeps the menu bar
-/// icon's position in its defaults domain: `NSStatusItem Preferred Position
-/// Item-0` in io.github.sevmorris.Dipstick, which snapshot-prefs captures.
-/// `swift test` never launches the app or creates the status item, so no test
-/// touches that domain, and the sibling apps' AppLauncher guard has nothing to
-/// guard here yet. Add it, with their `UserDefaults.app` isolation, alongside
-/// the first setting Dipstick stores itself.
-#if !TESTING
-@main
-#endif
 struct DipstickApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
-    @State private var model = StatusModel()
+
+    init() {
+        // Before the status item is made, so the snapshot can put the domain
+        // back.
+        if Snapshot.path(in: CommandLine.arguments) != nil { Snapshot.saveDomain() }
+    }
 
     var body: some Scene {
         MenuBarExtra {
-            StatusView(model: model)
+            StatusView(model: appDelegate.model)
         } label: {
             // The label is on screen from launch, so its task starts the
             // refresh loop before the menu is ever opened.
-            Image(systemName: model.symbolName)
+            Image(systemName: appDelegate.model.symbolName)
                 .task {
                     if let path = Snapshot.path(in: CommandLine.arguments) {
-                        let written = await Snapshot.write(model: model, to: path)
+                        let written = await Snapshot.write(model: appDelegate.model, to: path)
                         exit(written ? 0 : 1)
                     }
-                    model.start()
+                    appDelegate.model.start()
                 }
         }
         .menuBarExtraStyle(.window)

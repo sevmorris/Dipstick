@@ -321,6 +321,12 @@ step "Assembling ${APP_NAME}.app"
     || fail "Assembling the bundle failed"
 [[ "$(/usr/libexec/PlistBuddy -c "Print :LSUIElement" "$APP_PATH/Contents/Info.plist" 2>/dev/null)" == true ]] \
     || fail "The bundle is not marked LSUIElement — Dipstick would show a Dock icon"
+# make update, run in the console, asks System Events to delete the login
+# items mrk keeps off, and macOS holds Dipstick responsible for that request.
+# This key is the sentence macOS shows when it asks; without it, macOS refuses
+# the request without asking.
+/usr/libexec/PlistBuddy -c "Print :NSAppleEventsUsageDescription" "$APP_PATH/Contents/Info.plist" &>/dev/null \
+    || fail "The bundle has no NSAppleEventsUsageDescription — macOS would refuse make update's request to System Events without asking"
 ok "Bundle assembled"
 
 # ── Sign ──────────────────────────────────────────────────────────────────────
@@ -331,6 +337,15 @@ codesign --force --options runtime --timestamp \
     --entitlements "$ENTITLEMENTS" --sign "$IDENTITY" "$APP_PATH" \
     || fail "Codesigning failed"
 codesign --verify --deep --strict --verbose=2 "$APP_PATH" 2>&1 | tail -3
+# The same request again: under the hardened runtime, macOS also refuses Apple
+# events from an app whose signature lacks this entitlement, and does not ask.
+# build.sh's ad hoc signature has no hardened runtime, so a local build reaches
+# System Events whether the entitlement is there or not; only a release would
+# find out. Read into a variable first: under pipefail, grep -q closing the
+# pipe early could fail the check with the entitlement there.
+SIGNED_ENTITLEMENTS=$(codesign -d --entitlements - --xml "$APP_PATH" 2>/dev/null || true)
+grep -qF "com.apple.security.automation.apple-events" <<<"$SIGNED_ENTITLEMENTS" \
+    || fail "The signature has no com.apple.security.automation.apple-events entitlement — make update in the console could not ask System Events"
 ok "Codesigning complete"
 
 # ── Verify app version ────────────────────────────────────────────────────────

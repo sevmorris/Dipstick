@@ -19,10 +19,16 @@ warning and error, under the name of its panel, with its detail lines and its
 fix. Below that are the four panels, closed. Click a panel to see all its
 lines. When the list is taller than the window can be, it scrolls.
 
-Each fix is a button that shows the command it runs. The button opens a
-terminal and runs the command in `~/mrk`, the same way the `f` key does in
-`mrk-status`. Most fixes need a terminal: `make sync ARGS=-c` opens the picker,
-and `sudo` asks for a password.
+Each fix is a button that shows the command it runs. Click it and confirm,
+and the command runs in `~/mrk`, the same way the `f` key does in
+`mrk-status`, in Dipstick's console: a window with a phosphor screen and a
+terminal of Dipstick's own. You type in the console to answer what the command
+asks, such as `mrk-push`'s commit message or `sudo`'s password. ⌃C or ⌘. stops
+the command. When it ends, Dipstick runs `mrk-status` again.
+
+Three fixes draw a full-screen picker, which the console cannot show:
+`make sync ARGS=-c`, `make sync-login-items ARGS=-c` and `make brew`. They open
+a terminal instead, and so does the mrk-menu button.
 
 ## Install
 
@@ -46,19 +52,37 @@ result, so the dashboard and the menu bar always agree.
 - **Which mrk-status.** The first one found:
   `$DIPSTICK_MRK_STATUS`, then `$MRK_ROOT/bin/mrk-status`, then
   `~/bin/mrk-status`, then `~/mrk/bin/mrk-status`.
-- **Fixes.** Dipstick writes the command into a `.command` file and opens it.
-  That starts the command in the app that opens `.command` files (Terminal,
-  unless another terminal has claimed them). The file deletes itself when it
-  runs. Dipstick needs no Automation permission.
+- **Fixes.** The console runs the command with zsh in the checkout, on a
+  pseudo-terminal of its own, with the login shell's environment and
+  `MRK_ROOT`. It is a dumb terminal (`TERM=dumb`, 80 columns): it shows colour,
+  progress counters that write over their line, and what you type, and
+  `PAGER` and `GIT_PAGER` are `cat`. The console takes one fix at a time. While
+  a fix runs, its window does not close and Dipstick does not quit, so a fix
+  cannot be cut off between a commit and its push. If the window goes behind
+  another app's, the menu under the icon names the fix, with a Show button.
+  The screen can be Phosphor Green, Phosphor Amber or Plain. The button at
+  the top right of the console sets it.
+- **Fixes in a terminal.** For the full-screen fixes, Dipstick writes the
+  command into a `.command` file and opens it. That starts the command in the
+  app that opens `.command` files (Terminal, unless another terminal has
+  claimed them). The file deletes itself when it runs.
+- **Privacy.** A fix in the console runs as Dipstick's child, so macOS asks
+  about Dipstick, not Terminal. `make update` asks System Events to remove the
+  login items mrk keeps off, so the first time it runs, macOS asks whether
+  Dipstick may control System Events. `brew upgrade` replaces apps in
+  /Applications, which may need App Management for Dipstick in System
+  Settings → Privacy & Security. `make snapshot-prefs` and `make defaults` may
+  need access to other apps' data, as they do in Gearbox.
 - **Updates.** Check for Updates… in the window's footer asks GitHub for a
   newer Dipstick. Dipstick also asks at launch and once a day without telling
   you, and when a newer version is out, the footer names it in place of the
   button. A version that needs a newer macOS than this Mac has is not offered.
 
-Dipstick stores no settings of its own. AppKit keeps the menu bar icon's
-position in Dipstick's defaults domain, `io.github.sevmorris.Dipstick`, as it
-does for any menu bar item. Apart from that, Dipstick writes nothing but the
-`.command` files. The update check is its one network request.
+Dipstick stores one setting: the console's screen, as `consoleStyle` in its
+defaults domain, `io.github.sevmorris.Dipstick`. AppKit keeps the menu bar
+icon's position in the same domain, as it does for any menu bar item. Apart
+from that, Dipstick writes nothing but the `.command` files. The update check
+is its one network request.
 
 ## Requirements
 
@@ -83,10 +107,13 @@ DIPSTICK_MRK_STATUS=/path/to/mrk-status build/Dipstick.app/Contents/MacOS/Dipsti
 ```
 
 To write the window to a PNG, use `--snapshot`. Dipstick runs one refresh,
-opens the window under its icon as a click does, saves the image, and quits.
-The window is on screen for about a second. The image is of the menu bar
-window itself, at the size the menu bar gives it, and Dipstick prints that
-size in points:
+opens the window under its icon as a click does, and saves the image. Then it
+runs `make help` in the console, which lists mrk's Make targets and changes
+nothing, saves the console's window beside the first image with `-console`
+added to its name, and quits. The images are of the windows themselves, and
+Dipstick prints their sizes in points. The console's screen is Phosphor
+Green, whatever `consoleStyle` says, and Dipstick puts back any key the run
+wrote in its defaults domain:
 
 ```bash
 build/Dipstick.app/Contents/MacOS/Dipstick --snapshot ~/Desktop/dipstick.png
