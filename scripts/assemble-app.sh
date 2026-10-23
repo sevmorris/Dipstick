@@ -36,6 +36,11 @@ cp "$BINARY" "$APP_PATH/Contents/MacOS/$APP_NAME"
 cp "$ICON" "$APP_PATH/Contents/Resources/AppIcon.icns"
 
 # LSUIElement: a menu bar app, with no Dock icon and no app menu.
+# NSAppleEventsUsageDescription: make update, run in Dipstick's console,
+# asks System Events to delete the login items mrk keeps off (lib.sh's
+# remove_unwanted_login_items), and macOS holds Dipstick responsible for that
+# request. Without the key, macOS refuses it without asking. release.sh
+# checks for it, and for the entitlement the hardened runtime needs as well.
 cat > "$APP_PATH/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -63,6 +68,8 @@ cat > "$APP_PATH/Contents/Info.plist" <<PLIST
     <string>${MIN_MACOS}</string>
     <key>LSUIElement</key>
     <true/>
+    <key>NSAppleEventsUsageDescription</key>
+    <string>Dipstick runs mrk's fixes, and make update asks System Events to remove the login items mrk keeps off.</string>
     <key>NSHighResolutionCapable</key>
     <true/>
     <key>NSHumanReadableCopyright</key>

@@ -2,6 +2,39 @@ import XCTest
 @testable import Dipstick
 
 final class TerminalLauncherTests: XCTestCase {
+    /// Every fix mrk-status can offer, from tools/mrk-status in mrk at
+    /// da7192c (2026-10-22): dailyFixes in daily.go, the installation checks'
+    /// fixes in main.go, and Dipstick's own two, StatusError.fix. The ones
+    /// that draw a full screen open a terminal; the rest run in the console.
+    func testOnlyTheFullScreenFixesOpenATerminal() {
+        let terminal = ["mrk-menu", "make sync ARGS=-c", "make sync-login-items ARGS=-c", "make brew"]
+        let console = [
+            "bin/mrk-push", "bin/pushall", "make snapshot-prefs", "make pull", "make update",
+            "make updates", "make build-tools",
+            "make dotfiles", "make tools", "make fix-exec", "make defaults", "make trackpad",
+            "make harden", "chsh -s /opt/homebrew/bin/zsh", #"make setup ARGS="--only shell""#,
+            "make doctor ARGS=--fix",
+        ]
+        for command in terminal {
+            XCTAssertTrue(TerminalLauncher.isNeeded(for: command), command)
+        }
+        for command in console {
+            XCTAssertFalse(TerminalLauncher.isNeeded(for: command), command)
+        }
+    }
+
+    /// The program by any path, and make's target past its options and
+    /// variables.
+    func testTheRuleReadsTheProgramAndTheTarget() {
+        XCTAssertTrue(TerminalLauncher.isNeeded(for: "bin/mrk-picker"))
+        XCTAssertTrue(TerminalLauncher.isNeeded(for: "/Users/x/bin/mrk-menu --plain"))
+        XCTAssertTrue(TerminalLauncher.isNeeded(for: "gum choose a b"))
+        XCTAssertTrue(TerminalLauncher.isNeeded(for: "make -s ARGS=-c sync"))
+        XCTAssertFalse(TerminalLauncher.isNeeded(for: "make synced"))
+        XCTAssertFalse(TerminalLauncher.isNeeded(for: "make"))
+        XCTAssertFalse(TerminalLauncher.isNeeded(for: ""))
+    }
+
     func testQuotingSurvivesSingleQuotesAndSpaces() {
         XCTAssertEqual(TerminalLauncher.shellQuote("it's here"), #"'it'"'"'s here'"#)
         XCTAssertEqual(TerminalLauncher.shellQuote("/Users/x/my mrk"), "'/Users/x/my mrk'")

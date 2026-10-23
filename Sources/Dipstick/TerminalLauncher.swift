@@ -3,13 +3,45 @@ import AppKit
 /// Runs a command in a terminal window, the way the mrk-status TUI runs a fix:
 /// `cd <checkout> && <fix>`, with the terminal attached.
 ///
-/// Most fixes need one. `make sync ARGS=-c` opens the picker, pushall and
-/// nuke-mrk ask questions, and sudo asks for a password, so a fix cannot run
-/// hidden behind the menu bar. Dipstick writes the command into a `.command`
-/// file and opens it, which starts it in whichever terminal opens `.command`
-/// files — Terminal unless another app has claimed them. That needs no
-/// Automation permission, as scripting Terminal would.
+/// Dipstick 0.2 ran every fix this way. Now most run in Dipstick's console,
+/// which answers prompts and sudo's password but is a dumb terminal: it cannot
+/// draw a full screen. This is for the few that do (`isNeeded`). Dipstick
+/// writes the command into a `.command` file and opens it, which starts it in
+/// whichever terminal opens `.command` files — Terminal unless another app has
+/// claimed them. That needs no Automation permission, as scripting Terminal
+/// would.
 enum TerminalLauncher {
+    /// The programs that draw a full screen: they move the cursor about it and
+    /// read the arrow keys, and the console does neither. mrk-menu is a
+    /// bubbletea launcher, mrk-picker is mrk's package picker, and gum's
+    /// `choose` is the list mrk's scripts pick from.
+    static let fullScreenPrograms: Set<String> = ["mrk-menu", "mrk-picker", "gum"]
+
+    /// The Make targets whose scripts start one of those programs.
+    static let fullScreenTargets: Set<String> = [
+        // scripts/sync: mrk-picker for the packages the Brewfile lacks, and
+        // gum choose for the entries nothing installs. `make sync ARGS=-c`.
+        "sync",
+        // scripts/sync-login-items: gum choose for the login items to add,
+        // drop and settle. `make sync-login-items ARGS=-c`.
+        "sync-login-items",
+        // scripts/brew: gum choose, or mrk-picker, for what to install.
+        "brew",
+    ]
+
+    /// Whether `command`, a fix as mrk-status writes it, needs a terminal
+    /// window of its own. Every other fix runs in Dipstick's console.
+    static func isNeeded(for command: String) -> Bool {
+        let words = command.split(whereSeparator: \.isWhitespace).map(String.init)
+        guard let program = words.first else { return false }
+        if fullScreenPrograms.contains((program as NSString).lastPathComponent) { return true }
+        guard program == "make" else { return false }
+        // make's target is its first word that is neither an option nor a
+        // variable: `make sync ARGS=-c`.
+        let target = words.dropFirst().first { !$0.hasPrefix("-") && !$0.contains("=") }
+        return target.map(fullScreenTargets.contains) ?? false
+    }
+
     /// `s` in single quotes, for zsh.
     static func shellQuote(_ s: String) -> String {
         "'" + s.replacingOccurrences(of: "'", with: "'\"'\"'") + "'"

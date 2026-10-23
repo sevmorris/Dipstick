@@ -1,7 +1,7 @@
 import SwiftUI
 
-/// The window under the menu bar icon: the verdict, each warning and error,
-/// the four panels, and a Run button beside every fix.
+/// The window under the menu bar icon: the verdict, the fix in the console,
+/// each warning and error, the four panels, and a Run button beside every fix.
 struct StatusView: View {
     let model: StatusModel
 
@@ -9,6 +9,10 @@ struct StatusView: View {
         VStack(spacing: 0) {
             header
             Divider()
+            if let console = model.console {
+                ConsoleBanner(session: console, model: model)
+                Divider()
+            }
             if let error = model.error {
                 ErrorBanner(error: error, model: model)
                 Divider()
@@ -74,13 +78,50 @@ struct StatusView: View {
                 Button("Check for Updates…") { Task { await model.checkForUpdates() } }
                     .help("Ask GitHub for a Dipstick newer than \(UpdateChecker.installedVersion)")
             }
-            Button("mrk-menu") { model.runInTerminal("mrk-menu", confirm: false) }
+            Button("mrk-menu") { model.run("mrk-menu", confirm: false) }
                 .help("Open the mrk-menu launcher in a terminal")
             Button("Quit") { NSApplication.shared.terminate(nil) }
         }
         .controlSize(.small)
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
+    }
+}
+
+/// The fix in the console, which has a window of its own: a window that
+/// slips behind another app's has no Dock icon to bring it back.
+private struct ConsoleBanner: View {
+    let session: ConsoleSession
+    let model: StatusModel
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "terminal")
+                .foregroundStyle(.secondary)
+            Text(session.command)
+                .font(.callout.monospaced())
+                .lineLimit(1)
+                .truncationMode(.middle)
+            Text(state)
+                .font(.callout)
+                .foregroundStyle(.secondary)
+            Spacer(minLength: 4)
+            Button("Show") { model.showConsole() }
+                .controlSize(.small)
+                .help("Bring the console to the front")
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+    }
+
+    private var state: String {
+        switch session.state {
+        case .starting, .running: return "is running"
+        case .exited(0): return "finished"
+        case .exited(let status) where status > 128: return "was stopped"
+        case .exited(let status): return "exited \(status)"
+        case .failed: return "did not start"
+        }
     }
 }
 
@@ -221,9 +262,13 @@ private struct FixButton: View {
     let command: String
     let model: StatusModel
 
+    private var inTerminal: Bool { TerminalLauncher.isNeeded(for: command) }
+    /// The console takes one fix at a time.
+    private var waiting: Bool { !inTerminal && model.isConsoleRunning }
+
     var body: some View {
         Button {
-            model.runInTerminal(command)
+            model.run(command)
         } label: {
             Label(command, systemImage: "terminal")
                 .font(.caption.monospaced())
@@ -232,7 +277,10 @@ private struct FixButton: View {
         }
         .controlSize(.small)
         .frame(maxWidth: 170, alignment: .trailing)
-        .help("Run \(command) in a terminal")
+        .disabled(waiting)
+        .help(waiting ? "Another fix is running in the console"
+              : inTerminal ? "Run \(command) in a terminal: it draws a full-screen picker"
+              : "Run \(command) in Dipstick's console")
     }
 }
 
