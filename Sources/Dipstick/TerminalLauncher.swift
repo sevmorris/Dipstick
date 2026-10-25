@@ -35,11 +35,16 @@ enum TerminalLauncher {
         let words = command.split(whereSeparator: \.isWhitespace).map(String.init)
         guard let program = words.first else { return false }
         if fullScreenPrograms.contains((program as NSString).lastPathComponent) { return true }
-        guard program == "make" else { return false }
-        // make's target is its first word that is neither an option nor a
-        // variable: `make sync ARGS=-c`.
-        let target = words.dropFirst().first { !$0.hasPrefix("-") && !$0.contains("=") }
-        return target.map(fullScreenTargets.contains) ?? false
+        return makeTarget(of: command).map(fullScreenTargets.contains) ?? false
+    }
+
+    /// The Make target `command` runs, or nil when it is not `make`. make's
+    /// target is its first word that is neither an option nor a variable:
+    /// `make sync ARGS=-c`.
+    static func makeTarget(of command: String) -> String? {
+        let words = command.split(whereSeparator: \.isWhitespace).map(String.init)
+        guard words.first == "make" else { return nil }
+        return words.dropFirst().first { !$0.hasPrefix("-") && !$0.contains("=") }
     }
 
     /// `s` in single quotes, for zsh.

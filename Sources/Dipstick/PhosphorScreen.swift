@@ -1,8 +1,3 @@
-// Shared verbatim across the sibling app repos (Gearbox, Dipstick). Keep the
-// copies byte-identical: scripts/check-shared.sh compares them and a release
-// preflight fails when they drift. Anything one app needs on its own belongs
-// in that app's files, not here.
-
 import AppKit
 import SwiftUI
 

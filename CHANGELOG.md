@@ -4,6 +4,18 @@ All notable changes to Dipstick are documented here. Every released version has 
 
 Write a version's entry before releasing it, and put the same prose in `release-notes/v<version>.md`: `release.sh` publishes that file as the release's notes, and stops before building anything when it is absent.
 
+## [Unreleased]
+
+**Added**
+- **mrk Settings: Gearbox's four panes, in Dipstick.** A second window shows mrk's lists in `config/`: App Preferences (`snapshot-prefs --check`), macOS Defaults (`defaults.sh --check`, with a switch for each key), Login Items (`sync-login-items --check`, with Add, Ignore and Remove) and Dock (`config/dock.txt` and `dock-setup --check`). They are Gearbox's panes as Gearbox 0.5 had them, and they read mrk by the same `--check` line contract. **Settings…** in the menu bar window opens it, and so does opening Dipstick from Finder or Spotlight while it runs. Dipstick still never commits by itself: the Unrecorded panel then offers `mrk-push`.
+- **A fix that a pane makes opens the pane.** `make snapshot-prefs` opens App Preferences, `make sync-login-items ARGS=-c` opens Login Items, and `make defaults` and `make trackpad` open macOS Defaults. The pane shows what the fix would change, and runs nothing until you ask. `make sync-login-items ARGS=-c` no longer opens a terminal for `gum`.
+- **A Dock icon and a menu bar while a window is open.** While mrk Settings or the console is open, Dipstick is in the Dock and in ⌘-Tab, with **Check for Updates…**, **mrk Settings…** (⌘,) and **Refresh** (⌘R) in its menus. When both windows close, only the menu bar icon is left.
+
+**Changed**
+- **One console for the menu bar window and the panes.** A pane's Snapshot…, Apply All… and Apply… run in the console window that the fixes use, one command at a time. While a command runs, the panes wait under a banner that names it, and the fixes that use the console wait for a pane's switch or decision. When the command exits, Dipstick reads the pane on screen again and runs `mrk-status` again.
+- **`mrk-status` runs again after each pane change**: a switch, a login item decision, or an edit of `config/dock.txt`.
+- **`--snapshot` takes a folder** and draws the menu bar window, each pane of mrk Settings and the console into numbered PNGs in it.
+
 ## [0.3] — 2026-10-22
 
 **Changed**

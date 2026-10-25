@@ -53,7 +53,7 @@ extension UserDefaults {
         let scratch: String?
         if AppLauncher.isHostingTests {
             scratch = "io.github.sevmorris.Dipstick.tests"
-        } else if Snapshot.path(in: CommandLine.arguments) != nil {
+        } else if Snapshot.directory(in: CommandLine.arguments) != nil {
             scratch = "io.github.sevmorris.Dipstick.snapshot"
         } else {
             scratch = nil
@@ -69,23 +69,31 @@ extension UserDefaults {
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
     /// The app's one model. It lives here so that Quit can ask it whether a
-    /// fix is running.
+    /// command is running.
     let model = StatusModel()
 
     func applicationWillFinishLaunching(_ notification: Notification) {
-        // A menu bar app: no Dock icon and no app menu. The built bundle says
-        // so with LSUIElement; this covers `swift run`, which has no bundle.
+        // A menu bar app: no Dock icon and no app menu until a window opens
+        // (StatusModel.updateDockPresence). The built bundle says so with
+        // LSUIElement; this covers `swift run`, which has no bundle.
         NSApp.setActivationPolicy(.accessory)
     }
 
-    /// A fix running in the console keeps Dipstick open, as Gearbox's console
-    /// sheet keeps Gearbox open: quitting would hang the fix up half way. The
-    /// console comes forward to say why. A logout or a restart waits too.
+    /// A command running in the console keeps Dipstick open: quitting would
+    /// hang it up half way. The console comes forward to say why. A logout or
+    /// a restart waits too.
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
         guard model.isConsoleRunning else { return .terminateNow }
         model.showConsole()
         NSSound.beep()
         return .terminateCancel
+    }
+
+    /// A click on the Dock icon, which shows while a window is open: with
+    /// each one minimized, it brings mrk Settings back.
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows: Bool) -> Bool {
+        if !hasVisibleWindows { model.openSettings() }
+        return true
     }
 }
 
@@ -97,7 +105,7 @@ struct DipstickApp: App {
     init() {
         // Before the status item is made, so the snapshot can put the domain
         // back.
-        if Snapshot.path(in: CommandLine.arguments) != nil { Snapshot.saveDomain() }
+        if Snapshot.directory(in: CommandLine.arguments) != nil { Snapshot.saveDomain() }
     }
 
     var body: some Scene {
@@ -108,13 +116,31 @@ struct DipstickApp: App {
             // refresh loop before the menu is ever opened.
             Image(systemName: appDelegate.model.symbolName)
                 .task {
-                    if let path = Snapshot.path(in: CommandLine.arguments) {
-                        let written = await Snapshot.write(model: appDelegate.model, to: path)
+                    if let dir = Snapshot.directory(in: CommandLine.arguments) {
+                        let written = await Snapshot.write(model: appDelegate.model, to: dir)
                         exit(written ? 0 : 1)
                     }
                     appDelegate.model.start()
                 }
         }
         .menuBarExtraStyle(.window)
+        // The menu bar's menus, which show while a window gives Dipstick a
+        // Dock icon.
+        .commands {
+            CommandGroup(after: .appInfo) {
+                Button("Check for Updates…") {
+                    Task { await appDelegate.model.checkForUpdates() }
+                }
+            }
+            CommandGroup(replacing: .appSettings) {
+                Button("mrk Settings…") { appDelegate.model.openSettings() }
+                    .keyboardShortcut(",", modifiers: .command)
+            }
+            CommandGroup(replacing: .newItem) {}
+            CommandGroup(after: .toolbar) {
+                Button("Refresh") { Task { await appDelegate.model.refreshAll() } }
+                    .keyboardShortcut("r", modifiers: .command)
+            }
+        }
     }
 }

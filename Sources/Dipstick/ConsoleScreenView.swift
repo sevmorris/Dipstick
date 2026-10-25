@@ -1,16 +1,8 @@
-// Shared verbatim across the sibling app repos (Gearbox, Dipstick). Keep the
-// copies byte-identical: scripts/check-shared.sh compares them and a release
-// preflight fails when they drift. Anything one app needs on its own belongs
-// in that app's files, not here.
-
 import AppKit
 import SwiftUI
 
-// The console's screen, and the keys typed at it. What each app puts around
-// it, Gearbox's sheet and Dipstick's window, is that app's own
-// (ConsoleView.swift), and so is the session that runs the command
-// (Console.swift): Gearbox's runs one of its TerminalCommands, and
-// Dipstick's a fix as mrk-status writes it.
+// The console's screen, and the keys typed at it. The window around it is
+// ConsoleView.swift, and the session that runs the command is Console.swift.
 
 /// The console's screen: the text the terminal holds, in a text view inside
 /// the tube's clip, as MBM's log sits in its own.

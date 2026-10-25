@@ -2,13 +2,9 @@ import AppKit
 import Foundation
 import Observation
 
-/// One run of a fix in Dipstick's console, from its start to its exit: the
-/// screen it prints to, and the keys typed at it.
-///
-/// Gearbox's, copied rather than shared, as the command differs: here it is
-/// a line of shell, a fix as mrk-status writes it, where Gearbox's is one of
-/// its own TerminalCommands. The screen, the terminal and the tube it runs on
-/// are shared with Gearbox verbatim.
+/// One run of a command in Dipstick's console, from its start to its exit:
+/// the screen it prints to, and the keys typed at it. The command is a line
+/// of shell: a fix as mrk-status writes it, or a pane's TerminalCommand.
 @Observable @MainActor
 final class ConsoleSession: Identifiable {
     enum State: Equatable {
@@ -22,14 +18,18 @@ final class ConsoleSession: Identifiable {
 
     let id = UUID()
     let command: String
+    /// The pane that reads mrk again when the command has exited, for a
+    /// command a pane started.
+    let pane: Pane?
     private(set) var screen = TerminalScreen()
     private(set) var state = State.starting
     /// How many times Stop was pressed. Each press sends a harder signal.
     private(set) var stops = 0
     @ObservationIgnored private var terminal: PseudoTerminal?
 
-    init(command: String) {
+    init(command: String, pane: Pane? = nil) {
         self.command = command
+        self.pane = pane
     }
 
     var isRunning: Bool { state == .starting || state == .running }
