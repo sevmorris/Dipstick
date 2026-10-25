@@ -4,7 +4,7 @@ All notable changes to Dipstick are documented here. Every released version has 
 
 Write a version's entry before releasing it, and put the same prose in `release-notes/v<version>.md`: `release.sh` publishes that file as the release's notes, and stops before building anything when it is absent.
 
-## [Unreleased]
+## [0.4] — 2026-10-24
 
 **Added**
 - **mrk Settings: Gearbox's four panes, in Dipstick.** A second window shows mrk's lists in `config/`: App Preferences (`snapshot-prefs --check`), macOS Defaults (`defaults.sh --check`, with a switch for each key), Login Items (`sync-login-items --check`, with Add, Ignore and Remove) and Dock (`config/dock.txt` and `dock-setup --check`). They are Gearbox's panes as Gearbox 0.5 had them, and they read mrk by the same `--check` line contract. **Settings…** in the menu bar window opens it, and so does opening Dipstick from Finder or Spotlight while it runs. Dipstick still never commits by itself: the Unrecorded panel then offers `mrk-push`.
@@ -15,6 +15,14 @@ Write a version's entry before releasing it, and put the same prose in `release-
 - **One console for the menu bar window and the panes.** A pane's Snapshot…, Apply All… and Apply… run in the console window that the fixes use, one command at a time. While a command runs, the panes wait under a banner that names it, and the fixes that use the console wait for a pane's switch or decision. When the command exits, Dipstick reads the pane on screen again and runs `mrk-status` again.
 - **`mrk-status` runs again after each pane change**: a switch, a login item decision, or an edit of `config/dock.txt`.
 - **`--snapshot` takes a folder** and draws the menu bar window, each pane of mrk Settings and the console into numbered PNGs in it.
+
+**Moving from Gearbox**
+- **Dipstick 0.4 does what Gearbox did, so you can delete Gearbox.** Its panes, its console and its `--check` reading are here, and Gearbox has no further releases.
+- **macOS gives each app its own permissions**, so Gearbox's do not carry over. The Defaults pane reads Mail's keys only with Full Disk Access, and TextEdit's and Passwords' keys only with permission to get the data of other apps as well. Give Dipstick those permissions in System Settings → Privacy & Security. The Login Items pane reads the login items from System Events, so macOS asks once whether Dipstick may control System Events, unless `make update` in the console has already asked.
+- **Gearbox's own settings do not move**: the pane it showed, the Defaults filter and the trackpad switch start fresh.
+
+**Requirements**
+- Every pane needs mrk from 2026-10-23 on ([sevmorris/mrk#131](https://github.com/sevmorris/mrk/pull/131)). With an older mrk, a pane says what it cannot read and to run `make pull`, and the other panes still work.
 
 ## [0.3] — 2026-10-22
 
