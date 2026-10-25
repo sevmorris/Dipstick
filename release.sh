@@ -326,7 +326,7 @@ step "Assembling ${APP_NAME}.app"
 # This key is the sentence macOS shows when it asks; without it, macOS refuses
 # the request without asking.
 /usr/libexec/PlistBuddy -c "Print :NSAppleEventsUsageDescription" "$APP_PATH/Contents/Info.plist" &>/dev/null \
-    || fail "The bundle has no NSAppleEventsUsageDescription — macOS would refuse make update's request to System Events without asking"
+    || fail "The bundle has no NSAppleEventsUsageDescription — macOS would refuse the Login Items pane's and make update's requests to System Events without asking"
 ok "Bundle assembled"
 
 # ── Sign ──────────────────────────────────────────────────────────────────────
@@ -345,7 +345,7 @@ codesign --verify --deep --strict --verbose=2 "$APP_PATH" 2>&1 | tail -3
 # pipe early could fail the check with the entitlement there.
 SIGNED_ENTITLEMENTS=$(codesign -d --entitlements - --xml "$APP_PATH" 2>/dev/null || true)
 grep -qF "com.apple.security.automation.apple-events" <<<"$SIGNED_ENTITLEMENTS" \
-    || fail "The signature has no com.apple.security.automation.apple-events entitlement — make update in the console could not ask System Events"
+    || fail "The signature has no com.apple.security.automation.apple-events entitlement — the Login Items pane and make update could not ask System Events"
 ok "Codesigning complete"
 
 # ── Verify app version ────────────────────────────────────────────────────────

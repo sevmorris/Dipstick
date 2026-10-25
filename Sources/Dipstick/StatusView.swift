@@ -78,6 +78,9 @@ struct StatusView: View {
                 Button("Check for Updates…") { Task { await model.checkForUpdates() } }
                     .help("Ask GitHub for a Dipstick newer than \(UpdateChecker.installedVersion)")
             }
+            Button("Settings…") { model.openSettings() }
+                .keyboardShortcut(",", modifiers: .command)
+                .help("Open mrk Settings: app preferences, macOS defaults, login items and the Dock")
             Button("mrk-menu") { model.run("mrk-menu", confirm: false) }
                 .help("Open the mrk-menu launcher in a terminal")
             Button("Quit") { NSApplication.shared.terminate(nil) }
@@ -258,29 +261,40 @@ private struct LineRow: View {
 }
 
 /// The fix's own command is the label, so what a click runs is never a guess.
+/// A fix that a pane of mrk Settings makes instead names that pane: a click
+/// opens it, and runs nothing.
 private struct FixButton: View {
     let command: String
     let model: StatusModel
 
+    private var route: FixRoute? { FixRoute.route(for: command) }
     private var inTerminal: Bool { TerminalLauncher.isNeeded(for: command) }
-    /// The console takes one fix at a time.
-    private var waiting: Bool { !inTerminal && model.isConsoleRunning }
+    /// The console takes one command at a time, and waits for a pane's
+    /// decision.
+    private var waiting: Bool { route == nil && !inTerminal && model.isBusy }
 
     var body: some View {
         Button {
             model.run(command)
         } label: {
-            Label(command, systemImage: "terminal")
-                .font(.caption.monospaced())
-                .lineLimit(1)
-                .truncationMode(.middle)
+            if let route {
+                Label(route.pane.title + "…", systemImage: route.pane.symbol)
+                    .font(.caption)
+                    .lineLimit(1)
+            } else {
+                Label(command, systemImage: "terminal")
+                    .font(.caption.monospaced())
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+            }
         }
         .controlSize(.small)
         .frame(maxWidth: 170, alignment: .trailing)
         .disabled(waiting)
-        .help(waiting ? "Another fix is running in the console"
-              : inTerminal ? "Run \(command) in a terminal: it draws a full-screen picker"
-              : "Run \(command) in Dipstick's console")
+        .help(route.map { "Open \($0.pane.title) in mrk Settings, which shows what \(command) would change" }
+              ?? (waiting ? "A command is running in the console, or a pane is making a change"
+                  : inTerminal ? "Run \(command) in a terminal: it draws a full-screen picker"
+                  : "Run \(command) in Dipstick's console"))
     }
 }
 

@@ -1,8 +1,9 @@
 import AppKit
 import Observation
 
-/// What the menu bar shows: the last report, the last failure, and when; and
-/// the fix running in the console.
+/// What the menu bar shows: the last report, the last failure, and when; the
+/// command running in the console; and mrk Settings, the window over mrk's
+/// lists, once it has been opened.
 @Observable @MainActor
 final class StatusModel {
     typealias EnvironmentProvider = @Sendable () async -> [String: String]
@@ -15,8 +16,11 @@ final class StatusModel {
     private(set) var lastRefreshed: Date?
     /// A newer Dipstick, found by the quiet check. The footer offers it.
     private(set) var availableUpdate: AvailableUpdate?
-    /// The fix in the console, running or exited, until its window closes.
+    /// The command in the console, running or exited, until its window closes.
     private(set) var console: ConsoleSession?
+    /// mrk Settings' model: made the first time the window opens, and kept,
+    /// so each pane keeps what it read.
+    private(set) var settings: SettingsModel?
 
     let home: String
     private var environment: [String: String]?
@@ -25,6 +29,10 @@ final class StatusModel {
     /// and reads `console`.
     private let opensWindows: Bool
     @ObservationIgnored private var consoleWindow: ConsoleWindowController?
+    @ObservationIgnored private var settingsWindow: SettingsWindowController?
+    /// Where the settings window keeps what it stores: the app's own store,
+    /// unless a test gives its own.
+    private let settingsStore: UserDefaults
     /// Set when a fix ends while mrk-status runs. That run read mrk as it
     /// was, so it goes round again.
     @ObservationIgnored private var changedDuringRefresh = false
@@ -45,9 +53,10 @@ final class StatusModel {
     /// `environment` is what mrk-status and the console run with: the login
     /// shell's, unless a test gives its own.
     init(home: String = NSHomeDirectory(), opensWindows: Bool = true,
-         environment: EnvironmentProvider? = nil) {
+         environment: EnvironmentProvider? = nil, settingsStore: UserDefaults = .app) {
         self.home = home
         self.opensWindows = opensWindows
+        self.settingsStore = settingsStore
         self.environmentProvider = environment ?? { await Self.loginShellEnvironment(home: home) }
     }
 
@@ -64,11 +73,11 @@ final class StatusModel {
         return env
     }
 
-    /// The checkout mrk-status reports on, and where a fix runs.
-    var repoRoot: String {
-        if let root = environment?["MRK_ROOT"], !root.isEmpty { return root }
-        return home + "/mrk"
-    }
+    /// The checkout mrk-status reports on, where a fix runs, and the one mrk
+    /// Settings reads: MRK_ROOT as the login shell sets it, or ~/mrk.
+    var checkout: MrkCheckout { .resolve(environment: environment ?? [:], home: home) }
+
+    var repoRoot: String { checkout.root.path }
 
     /// The menu bar icon. A report that could not be read is its own state,
     /// apart from a report that says something is wrong.
@@ -116,6 +125,7 @@ final class StatusModel {
             changedDuringRefresh = false
             if environment == nil || reload {
                 environment = await environmentProvider()
+                await settings?.runner.forgetEnvironment()
             }
 
             switch await StatusRunner.fetch(environment: environment ?? [:], home: home) {
@@ -141,7 +151,7 @@ final class StatusModel {
         }
     }
 
-    private func resolvedEnvironment() async -> [String: String] {
+    func resolvedEnvironment() async -> [String: String] {
         if let environment { return environment }
         let env = await environmentProvider()
         environment = env
@@ -150,8 +160,14 @@ final class StatusModel {
 
     /// Runs `command` in the checkout, as the TUI's `f` does: in Dipstick's
     /// console, or in a terminal for the few fixes that draw a full screen
-    /// (TerminalLauncher.isNeeded). A fix asks first, as `f` does.
+    /// (TerminalLauncher.isNeeded). A fix asks first, as `f` does. A fix that
+    /// a pane of mrk Settings makes instead (FixRoute) opens that pane: it
+    /// shows what the fix would change, and runs nothing until asked.
     func run(_ command: String, confirm: Bool = true) {
+        if let route = FixRoute.route(for: command) {
+            openSettings(route.pane, withTrackpad: route.withTrackpad)
+            return
+        }
         let inTerminal = TerminalLauncher.isNeeded(for: command)
         NSApp.activate()
         if confirm {
@@ -170,20 +186,26 @@ final class StatusModel {
         }
     }
 
-    /// Whether a fix is running in the console. Dipstick does not quit then,
-    /// and the fix buttons that would use the console wait.
+    /// Whether a command is running in the console. Dipstick does not quit
+    /// then, and the fix buttons that would use the console wait, as do the
+    /// panes of mrk Settings.
     var isConsoleRunning: Bool { console?.isRunning == true }
 
-    /// Runs a fix in the console, in the checkout, and runs mrk-status again
-    /// once it has exited. One at a time: while one runs, this brings it to
-    /// the front instead. One that has exited gives way.
-    func runInConsole(_ command: String) async {
+    /// Whether a fix that runs in the console must wait: one is running
+    /// there, or a pane is running one of its decisions.
+    var isBusy: Bool { isConsoleRunning || settings?.isDeciding == true }
+
+    /// Runs a command in the console, in the checkout, and runs mrk-status
+    /// again once it has exited, after reading `pane` again when a pane
+    /// started it. One at a time: while one runs, this brings it to the front
+    /// instead. One that has exited gives way.
+    func runInConsole(_ command: String, pane: Pane? = nil) async {
         if isConsoleRunning {
             showConsole()
             return
         }
         closeConsole()
-        let session = ConsoleSession(command: command)
+        let session = ConsoleSession(command: command, pane: pane)
         console = session
         var window: ConsoleWindowController?
         if opensWindows {
@@ -195,11 +217,24 @@ final class StatusModel {
                 })
             consoleWindow = window
             window?.show()
+            updateDockPresence()
         }
         let shell = await resolvedEnvironment()
         await session.run(environment: Self.consoleEnvironment(shell, root: repoRoot), directory: repoRoot)
         window?.commandChanged()
-        if case .exited = session.state { await refreshAfterFix() }
+        guard case .exited = session.state else { return }
+        // A command can change what any pane shows, so the pane on screen
+        // reads mrk again too.
+        if let settings, let shown = pane ?? (settingsWindow != nil ? settings.selection : nil) {
+            await settings.load(shown)
+        }
+        await refreshAfterFix()
+    }
+
+    /// A pane changed mrk: a switch, a login item decision, or an edit of
+    /// config/dock.txt. mrk-status reads it again.
+    func mrkChanged() {
+        Task { await refreshAfterFix() }
     }
 
     /// Brings the console's window to the front.
@@ -207,13 +242,14 @@ final class StatusModel {
         consoleWindow?.show()
     }
 
-    /// Closes the console once its fix has exited.
+    /// Closes the console once its command has exited.
     func closeConsole() {
         guard let console, !console.isRunning else { return }
         let window = consoleWindow
         consoleWindow = nil
         self.console = nil
         window?.close()
+        updateDockPresence()
     }
 
     /// The console's window, for `--snapshot` to draw.
@@ -224,12 +260,90 @@ final class StatusModel {
         guard console === session else { return }
         consoleWindow = nil
         console = nil
+        updateDockPresence()
     }
 
-    /// The environment of a fix in the console: the login shell's, as a
+    // MARK: - mrk Settings
+
+    /// mrk Settings' model, made the first time it is asked for, over the
+    /// checkout the login shell names. Its scripts run with this model's
+    /// environment, and its console commands run in this model's console.
+    func settingsModel() async -> SettingsModel {
+        if let settings { return settings }
+        _ = await resolvedEnvironment()
+        // Asked again: another call can have made it while the shell answered.
+        if let settings { return settings }
+        let made = SettingsModel(
+            checkout: checkout,
+            runner: MrkRunner(environment: { [weak self] in await self?.resolvedEnvironment() ?? [:] }),
+            store: settingsStore, home: home)
+        made.host = self
+        settings = made
+        return made
+    }
+
+    /// Opens mrk Settings, at `pane` when given, and reads the pane it shows:
+    /// what a pane read when it was last open can be old. `withTrackpad`
+    /// turns the Defaults pane's trackpad keys on, for make trackpad's fix.
+    /// The task ends once the pane has read mrk.
+    @discardableResult
+    func openSettings(_ pane: Pane? = nil, withTrackpad: Bool = false) -> Task<Void, Never> {
+        Task {
+            let settings = await settingsModel()
+            if let pane { settings.selection = pane }
+            if withTrackpad { settings.defaults.withTrackpad = true }
+            if opensWindows { showSettingsWindow(settings) }
+            await settings.load(settings.selection ?? .preferences)
+        }
+    }
+
+    private func showSettingsWindow(_ settings: SettingsModel) {
+        if settingsWindow == nil {
+            settingsWindow = SettingsWindowController(
+                settings: settings, status: self,
+                closed: { [weak self] in self?.settingsDidClose() })
+        }
+        settingsWindow?.show()
+        updateDockPresence()
+    }
+
+    /// mrk Settings' window, for `--snapshot` to draw.
+    var settingsWindowForSnapshot: NSWindow? { settingsWindow?.window }
+
+    func closeSettings() {
+        settingsWindow?.close()
+    }
+
+    private func settingsDidClose() {
+        settingsWindow = nil
+        updateDockPresence()
+    }
+
+    /// Refresh, from the menu bar's menu: mrk-status, and the pane mrk
+    /// Settings shows.
+    func refreshAll() async {
+        if let settings, settingsWindow != nil {
+            await settings.load(settings.selection ?? .preferences)
+        }
+        await refresh(reloadEnvironment: true)
+    }
+
+    /// Dipstick has a Dock icon while it has a window open, mrk Settings or
+    /// the console, and none when only its menu bar icon is left. A window
+    /// with no Dock icon is lost behind another app's, and the app menu, with
+    /// Check for Updates… and Refresh, shows only for an app in the Dock.
+    private func updateDockPresence() {
+        guard opensWindows else { return }
+        let policy: NSApplication.ActivationPolicy =
+            settingsWindow != nil || consoleWindow != nil ? .regular : .accessory
+        guard NSApp.activationPolicy() != policy else { return }
+        NSApp.setActivationPolicy(policy)
+        if policy == .regular { NSApp.activate() }
+    }
+
+    /// The environment of a command in the console: the login shell's, as a
     /// terminal window has it, on a terminal that draws what TERM=dumb
     /// promises. The .command file exported MRK_ROOT, and so does this.
-    /// Gearbox's, with the checkout as a path.
     static func consoleEnvironment(_ shell: [String: String], root: String) -> [String: String] {
         var env = shell
         env["MRK_ROOT"] = root

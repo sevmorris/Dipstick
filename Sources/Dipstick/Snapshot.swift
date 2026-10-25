@@ -1,25 +1,26 @@
 import AppKit
 import SwiftUI
 
-/// `Dipstick --snapshot <file.png>`: one refresh, the window drawn into a PNG,
-/// then the console drawn into a second PNG beside it, and quit. It runs the
-/// path the menu bar runs — the shell's environment, mrk-status, the view — so
-/// it checks the window without a click on the menu bar, and it makes the
-/// README's picture.
+/// `Dipstick --snapshot <directory>`: one refresh, the menu bar window drawn
+/// into a PNG, then each pane of mrk Settings, then the console, each into a
+/// PNG of its own in the directory, and quit. It runs the path a click runs —
+/// the shell's environment, mrk-status, each pane's real check against the
+/// checkout — so it checks every window without a click, and it makes the
+/// README's pictures.
 enum Snapshot {
-    static func path(in arguments: [String]) -> String? {
+    static func directory(in arguments: [String]) -> String? {
         guard let flag = arguments.firstIndex(of: "--snapshot"),
               flag + 1 < arguments.count else { return nil }
         return arguments[flag + 1]
     }
 
-    /// Where the console's picture goes: beside the window's, with
-    /// "-console" before the extension.
-    static func consolePath(for path: String) -> String {
-        let url = URL(fileURLWithPath: path)
-        let ext = url.pathExtension
-        return url.deletingPathExtension().path + "-console" + (ext.isEmpty ? "" : "." + ext)
+    static let statusFileName = "1-status.png"
+
+    static func fileName(_ pane: Pane) -> String {
+        "\((Pane.allCases.firstIndex(of: pane) ?? 0) + 2)-\(pane.rawValue).png"
     }
+
+    static var consoleFileName: String { "\(Pane.allCases.count + 2)-console.png" }
 
     /// What the snapshot's console runs: mrk's list of its Make targets, which
     /// reads the Makefile and changes nothing.
@@ -28,7 +29,7 @@ enum Snapshot {
     /// The app's real domain as it was before the status item was made: nil
     /// when there was none. AppKit writes the menu bar icon's position into
     /// it, and snapshot-prefs exports every io.github.sevmorris.* domain. So
-    /// the snapshot puts the domain back as it found it, as Gearbox's does.
+    /// the snapshot puts the domain back as it found it.
     nonisolated(unsafe) private static var savedDomain: [String: Any]?
     nonisolated(unsafe) private static var savedDomainTaken = false
 
@@ -39,9 +40,8 @@ enum Snapshot {
     }
 
     /// Key by key, through the app's own defaults: a key the run added goes,
-    /// and one it changed gets its old value back. Gearbox found that
-    /// setPersistentDomain and removePersistentDomain leave a window's keys in
-    /// place.
+    /// and one it changed gets its old value back. setPersistentDomain and
+    /// removePersistentDomain leave a window's keys in place.
     static func restoreDomain() {
         guard savedDomainTaken, let id = Bundle.main.bundleIdentifier else { return }
         let before = savedDomain ?? [:]
@@ -61,8 +61,11 @@ enum Snapshot {
     /// StatusView in an NSHostingView sized by its fittingSize, and showed
     /// every panel, while the menu bar window gave the panels 0 pt.
     @MainActor
-    static func write(model: StatusModel, to path: String) async -> Bool {
+    static func write(model: StatusModel, to directory: String) async -> Bool {
         defer { restoreDomain() }
+        let dir = URL(fileURLWithPath: directory, isDirectory: true)
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        let path = dir.appendingPathComponent(statusFileName).path
         await model.refresh()
         if let error = model.error {
             say(error.message)
@@ -88,11 +91,58 @@ enum Snapshot {
         guard let png = rep.representation(using: .png, properties: [:]),
               (try? png.write(to: URL(fileURLWithPath: path))) != nil else { return false }
         say("wrote \(path), \(Int(size.width))×\(Int(size.height)) pt")
-        return await writeConsole(model: model, to: consolePath(for: path))
+        window.close()
+        let panes = await writeSettings(model: model, to: dir)
+        let console = await writeConsole(model: model, to: dir.appendingPathComponent(consoleFileName).path)
+        return panes && console
     }
 
-    /// The console, after the menu bar window, running make help. Its window
-    /// is drawn on its own, title bar and all.
+    /// Each pane of mrk Settings in turn, loaded as the window loads it.
+    @MainActor
+    private static func writeSettings(model: StatusModel, to dir: URL) async -> Bool {
+        model.openSettings(.preferences)
+        var shown: NSWindow?
+        for _ in 0..<50 {
+            if let window = model.settingsWindowForSnapshot, window.isVisible {
+                shown = window
+                break
+            }
+            try? await Task.sleep(for: .milliseconds(100))
+        }
+        guard let window = shown, let settings = model.settings else {
+            say("mrk Settings did not open")
+            return false
+        }
+        clearAutosave(in: window.contentView)
+        window.setContentSize(NSSize(width: 1120, height: 720))
+        var ok = true
+        for pane in Pane.allCases {
+            settings.selection = pane
+            await settings.load(pane)
+            await settle(window)
+            let url = dir.appendingPathComponent(fileName(pane))
+            if capture(window, to: url) {
+                say("wrote \(url.path), \(Int(window.frame.width))×\(Int(window.frame.height)) pt")
+            } else {
+                say("could not draw \(pane.title)")
+                ok = false
+            }
+        }
+        model.closeSettings()
+        return ok
+    }
+
+    /// A split view with an autosave name keeps its widths in the app's real
+    /// domain. The snapshot's sizes are not ones to remember.
+    @MainActor
+    private static func clearAutosave(in view: NSView?) {
+        guard let view else { return }
+        if let split = view as? NSSplitView { split.autosaveName = nil }
+        view.subviews.forEach(clearAutosave)
+    }
+
+    /// The console, last, running make help. Its window is drawn on its own,
+    /// title bar and all.
     @MainActor
     private static func writeConsole(model: StatusModel, to path: String) async -> Bool {
         Task { await model.runInConsole(consoleCommand) }
@@ -138,9 +188,9 @@ enum Snapshot {
         return view.subviews.lazy.compactMap { statusButton(in: $0) }.first
     }
 
-    /// Gearbox's: SwiftUI lays a window out over more than one pass, so wait
-    /// until it has drawn and kept still for 0.5 s. The tube's refresh sweep
-    /// never keeps still, so this can take its full 8 s.
+    /// SwiftUI lays a window out over more than one pass, so wait until it
+    /// has drawn and kept still for 0.5 s. The tube's refresh sweep never
+    /// keeps still, so the console's can take the full 8 s.
     @MainActor
     private static func settle(_ window: NSWindow) async {
         try? await Task.sleep(for: .milliseconds(600))

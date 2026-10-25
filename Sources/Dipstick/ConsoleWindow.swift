@@ -1,15 +1,12 @@
 import AppKit
 import SwiftUI
 
-/// The console's window, one for each fix run in it.
+/// The console's window, one for each command run in it.
 ///
-/// Gearbox shows its console as a sheet, and AppKit keeps a window with a
-/// sheet from closing and the app from quitting. Dipstick's own window is the
-/// menu bar's, which closes as soon as it loses focus, so the console gets a
-/// window of its own, which does what the sheet's did: it does not close while
-/// its command runs, and AppDelegate does not let Dipstick quit then either.
-/// So nothing short of a force quit hangs a fix up half way, between a commit
-/// and its push.
+/// It does not close while its command runs, and AppDelegate does not let
+/// Dipstick quit then either, as AppKit keeps a window with a sheet open. So
+/// nothing short of a force quit hangs a command up half way, between a
+/// commit and its push.
 ///
 /// The window remembers no frame. An autosave name would put it in Dipstick's
 /// real defaults domain, which snapshot-prefs exports.
@@ -41,8 +38,8 @@ final class ConsoleWindowController: NSWindowController, NSWindowDelegate {
     @available(*, unavailable)
     required init?(coder: NSCoder) { fatalError("not from a nib") }
 
-    /// Brings the console to the front, where typing goes to it. Dipstick has
-    /// no Dock icon to click, so the app comes forward with it.
+    /// Brings the console to the front, where typing goes to it. The app
+    /// comes forward with it.
     func show() {
         NSApp.activate()
         window?.makeKeyAndOrderFront(nil)
@@ -64,8 +61,8 @@ final class ConsoleWindowController: NSWindowController, NSWindowDelegate {
     }
 }
 
-/// A word on a coloured capsule: the console's state, beside its command.
-/// Gearbox's.
+/// A word on a coloured capsule: the console's state beside its command, and
+/// a key's state in the panes.
 struct Badge: View {
     let text: String
     let color: Color

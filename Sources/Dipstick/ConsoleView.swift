@@ -1,13 +1,11 @@
 import AppKit
 import SwiftUI
 
-/// The console: a window that runs one fix on a terminal of Dipstick's own,
-/// and shows it on a phosphor screen.
-///
-/// Gearbox's console sheet, in a window of its own (ConsoleWindow.swift): a
-/// sheet needs a window to hang from, and the menu bar's closes as soon as it
-/// loses focus. The screen inside it is Gearbox's, shared verbatim
-/// (ConsoleScreenView.swift).
+/// The console: a window that runs one command on a terminal of Dipstick's
+/// own, and shows it on a phosphor screen (ConsoleScreenView.swift). It is a
+/// window of its own (ConsoleWindow.swift), not a sheet, for the fixes of the
+/// menu bar and the commands of mrk Settings alike: a sheet needs a window to
+/// hang from, and the menu bar's closes as soon as it loses focus.
 struct ConsoleWindowView: View {
     let session: ConsoleSession
     let close: () -> Void
@@ -100,17 +98,19 @@ struct ConsoleWindowView: View {
     }
 
     private var note: String {
+        let after = session.pane.map { "Dipstick reads the \($0.title) pane and runs mrk-status again." }
+            ?? "Dipstick runs mrk-status again."
         switch session.state {
         case .starting:
             return "Starting…"
         case .running:
             return "Type here to answer what it asks. ⌃C or ⌘. stops it."
         case .exited(0):
-            return "It finished. Dipstick runs mrk-status again."
+            return "It finished. \(after)"
         case .exited(let status) where status > 128:
-            return "Signal \(status - 128) stopped it. Dipstick runs mrk-status again."
+            return "Signal \(status - 128) stopped it. \(after)"
         case .exited(let status):
-            return "It exited \(status). Dipstick runs mrk-status again."
+            return "It exited \(status). \(after)"
         case .failed(let message):
             return message
         }
