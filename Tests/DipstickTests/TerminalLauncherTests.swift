@@ -23,6 +23,42 @@ final class TerminalLauncherTests: XCTestCase {
         }
     }
 
+    /// The real contract sends the same fixes to a terminal as the targets
+    /// Dipstick keeps for an older mrk, and names each of those targets. Its
+    /// fourth, `all`, is no fix: it makes `brew`.
+    func testTheRealContractNamesTheTargetsDipstickKeeps() throws {
+        let contract = try MrkContract.decode(Data(try Fixture.text("mrk-contract.json").utf8))
+        let targets = TerminalLauncher.targets(in: contract)
+        XCTAssertEqual(targets, ["all", "brew", "sync", "sync-login-items"])
+        XCTAssertTrue(TerminalLauncher.fullScreenTargets.isSubset(of: targets))
+        for command in ["mrk-menu", "make sync ARGS=-c", "make sync-login-items ARGS=-c", "make brew",
+                        "make snapshot-prefs", "make update", "make defaults", "make doctor ARGS=--fix"] {
+            XCTAssertEqual(TerminalLauncher.isNeeded(for: command, targets: targets),
+                           TerminalLauncher.isNeeded(for: command), command)
+        }
+    }
+
+    /// A contract's list is the targets, whatever Dipstick keeps: one that
+    /// lists a new target sends it to a terminal, and one that leaves a target
+    /// out runs it in the console. No contract, or one from before the list,
+    /// keeps Dipstick's own.
+    func testTheTargetsAreTheContractsOrElseDipsticks() throws {
+        let listed = try MrkContract.decode(Data(ContractTests.contract(terminal: ["pick", "sync"]).utf8))
+        let targets = TerminalLauncher.targets(in: listed)
+        XCTAssertEqual(targets, ["pick", "sync"])
+        XCTAssertTrue(TerminalLauncher.isNeeded(for: "make pick ARGS=-n", targets: targets))
+        XCTAssertFalse(TerminalLauncher.isNeeded(for: "make brew", targets: targets))
+        XCTAssertTrue(TerminalLauncher.isNeeded(for: "gum choose a b", targets: targets), "a program by its name still")
+
+        let none = try MrkContract.decode(Data(ContractTests.contract(terminal: []).utf8))
+        XCTAssertEqual(TerminalLauncher.targets(in: none), [])
+
+        let before = try MrkContract.decode(Data(try Fixture.text("mrk-140/mrk-contract.json").utf8))
+        XCTAssertNil(before.terminal)
+        XCTAssertEqual(TerminalLauncher.targets(in: before), TerminalLauncher.fullScreenTargets)
+        XCTAssertEqual(TerminalLauncher.targets(in: nil), TerminalLauncher.fullScreenTargets)
+    }
+
     /// The program by any path, and make's target past its options and
     /// variables.
     func testTheRuleReadsTheProgramAndTheTarget() {
@@ -82,5 +118,52 @@ final class TerminalLauncherTests: XCTestCase {
         XCTAssertTrue(out.contains(work.resolvingSymlinksInPath().path), out)
         XCTAssertTrue(out.contains("Dipstick: exited 3."), out)
         XCTAssertFalse(FileManager.default.fileExists(atPath: file.path))
+    }
+}
+
+/// The menu bar's fixes go to a terminal by the targets of the checkout's
+/// mrk-contract, read at each refresh.
+@MainActor
+final class TerminalTargetsTests: XCTestCase {
+    /// With no mrk-contract the targets are Dipstick's own. Once the checkout
+    /// has one with a list, the next refresh reads it, and a change to the
+    /// file is read at the refresh after it.
+    func testTheRefreshReadsTheCheckoutsTargets() async throws {
+        let stub = try StubMrk()
+        let model = stub.model()
+        await model.refresh()
+        XCTAssertEqual(model.terminalTargets, TerminalLauncher.fullScreenTargets)
+        XCTAssertTrue(model.needsTerminal("make brew"))
+        XCTAssertEqual(stub.contractCalls, 0)
+
+        try stub.contract(ContractTests.contract(terminal: ["sync", "update"]))
+        await model.refresh()
+        XCTAssertTrue(model.needsTerminal("make update"))
+        XCTAssertTrue(model.needsTerminal("make sync ARGS=-c"))
+        XCTAssertFalse(model.needsTerminal("make brew"))
+        XCTAssertTrue(model.needsTerminal("mrk-menu"))
+
+        await model.refresh()
+        XCTAssertEqual(stub.contractCalls, 1, "read once while the file is the same")
+
+        try stub.contract(ContractTests.contract())
+        let url = stub.root.appendingPathComponent("scripts/mrk-contract")
+        try FileManager.default.setAttributes([.modificationDate: Date().addingTimeInterval(60)], ofItemAtPath: url.path)
+        await model.refresh()
+        XCTAssertEqual(model.terminalTargets, TerminalLauncher.fullScreenTargets, "a contract with no list")
+        XCTAssertEqual(stub.contractCalls, 2)
+    }
+
+    /// mrk Settings runs its scripts with the same runner, so the panes and
+    /// the refresh read the contract once between them.
+    func testThePanesAndTheRefreshShareTheContract() async throws {
+        let stub = try StubMrk()
+        try stub.contract(ContractTests.contract(terminal: ["sync"]))
+        let model = stub.model()
+        await model.refresh()
+        let settings = await model.settingsModel()
+        XCTAssertTrue(settings.runner === model.runner)
+        _ = try await settings.runner.run(.dockCheck, in: stub.checkout)
+        XCTAssertEqual(stub.contractCalls, 1, "\(stub.calls)")
     }
 }

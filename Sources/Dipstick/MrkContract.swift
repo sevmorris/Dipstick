@@ -9,13 +9,13 @@ import Foundation
 /// mrk-contract; for it, MrkRunner reads an exit 2 by its stderr, as
 /// `refusesAnOption` does.
 ///
-/// Dipstick reads the options alone. The document also names each script's
-/// decisions, and the fields and words of its --check lines, which the
-/// parsers read by the line contract instead.
+/// Dipstick reads the options, and the Make targets that need a terminal. The
+/// document also names each script's decisions, and the fields and words of
+/// its --check lines, which the parsers read by the line contract instead.
 struct MrkContract: Decodable, Equatable, Sendable {
     /// The version this build reads. mrk raises it when it deletes an option,
     /// a field or a key, moves a field, or gives a word or a key a new
-    /// meaning. A new script, option, field, word or key keeps it.
+    /// meaning. A new script, option, field, word, target or key keeps it.
     static let supportedVersion = 1
     /// The command, in the checkout.
     static let script = "scripts/mrk-contract"
@@ -23,6 +23,10 @@ struct MrkContract: Decodable, Equatable, Sendable {
     let contract: Int
     /// Each script, by its path in the checkout, such as scripts/sync.
     let scripts: [String: Script]
+    /// The Make targets whose scripts can start gum, mrk-picker or mrk-menu,
+    /// which draw a full screen (TerminalLauncher). nil when the contract has
+    /// no list, as the first one, from sevmorris/mrk#140, has not.
+    let terminal: [String]?
 
     struct Script: Decodable, Equatable, Sendable {
         /// Every option the script takes, each short form apart.

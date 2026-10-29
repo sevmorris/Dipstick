@@ -268,7 +268,7 @@ private struct FixButton: View {
     let model: StatusModel
 
     private var route: FixRoute? { FixRoute.route(for: command) }
-    private var inTerminal: Bool { TerminalLauncher.isNeeded(for: command) }
+    private var inTerminal: Bool { model.needsTerminal(command) }
     /// The console takes one command at a time, and waits for a pane's
     /// decision.
     private var waiting: Bool { route == nil && !inTerminal && model.isBusy }
