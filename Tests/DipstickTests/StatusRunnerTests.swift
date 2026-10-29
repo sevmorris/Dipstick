@@ -61,6 +61,22 @@ final class StatusRunnerTests: XCTestCase {
         guard case .unreadable = r.failure else { return XCTFail("expected unreadable, got \(r)") }
     }
 
+    /// A later schema that renamed a key does not decode. The schema alone
+    /// says which side is older (sevmorris/mrk audit 22, O-2); a document of
+    /// this schema that does not decode is unreadable.
+    func testALaterSchemaThatDoesNotDecodeIsNamed() {
+        let later = #"{"schema": 2, "verdict": "warn", "summary": "1 warning", "panels": []}"#
+        let r = StatusRunner.interpret(result(0, out: later), path: "/p")
+        XCTAssertEqual(r.failure, .newerSchema(2))
+        XCTAssertTrue(r.failure!.message.contains("writes schema 2, and Dipstick reads schema 1"), r.failure!.message)
+        XCTAssertTrue(r.failure!.message.contains("Check for Updates"))
+        XCTAssertNil(r.failure?.fix)
+        let broken = #"{"schema": 1, "verdict": "warn", "summary": "1 warning", "panels": []}"#
+        guard case .unreadable = StatusRunner.interpret(result(0, out: broken), path: "/p").failure else {
+            return XCTFail("expected unreadable")
+        }
+    }
+
     func testTheDocumentIsAReport() {
         let r = StatusRunner.interpret(result(0, out: sampleReport), path: "/p")
         XCTAssertEqual(try r.get().summary, "1 error")

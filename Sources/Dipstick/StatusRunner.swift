@@ -8,6 +8,8 @@ enum StatusError: Error, Equatable, Sendable {
     case timedOut(seconds: Int)
     case failed(status: Int32, message: String)
     case unreadable(message: String)
+    /// A document of a later schema that this build cannot decode.
+    case newerSchema(Int)
 
     var message: String {
         switch self {
@@ -23,6 +25,8 @@ enum StatusError: Error, Equatable, Sendable {
                 : "mrk-status exited \(status): \(message)"
         case .unreadable(let message):
             return "mrk-status printed something Dipstick cannot read: \(message)"
+        case .newerSchema(let schema):
+            return "This mrk-status writes schema \(schema), and Dipstick reads schema \(StatusReport.supportedSchema). Choose Check for Updates… in Dipstick's menu."
         }
     }
 
@@ -31,7 +35,7 @@ enum StatusError: Error, Equatable, Sendable {
         switch self {
         case .notFound: return "make build-tools"
         case .tooOld: return "make pull"
-        case .timedOut, .failed, .unreadable: return nil
+        case .timedOut, .failed, .unreadable, .newerSchema: return nil
         }
     }
 }
@@ -85,6 +89,12 @@ enum StatusRunner {
         do {
             return .success(try StatusReport.decode(result.stdout))
         } catch {
+            // A later schema that deleted or renamed a key: say which side is
+            // older, not that the output cannot be read (sevmorris/mrk audit
+            // 22, O-2). A document that decodes shows with a note instead.
+            if let schema = StatusReport.schema(of: result.stdout), schema > StatusReport.supportedSchema {
+                return .failure(.newerSchema(schema))
+            }
             return .failure(.unreadable(message: String(describing: error)))
         }
     }
