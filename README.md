@@ -75,9 +75,18 @@ scalar, and a line taken when it has at least the fields Dipstick knows,
 because a later mrk can add more at the end. A line with a word that Dipstick
 does not know is passed over. When a check prints lines and Dipstick reads none
 of them, the pane says that this Dipstick is older than mrk's output. It does
-not show an empty list. A script that exits 2 and names an option Dipstick
-passes as unknown is an mrk older than Dipstick, and the pane says to run
-`make pull`. Any other refusal shows mrk's own reason.
+not show an empty list.
+
+Before a pane runs a script, Dipstick reads the checkout's
+`scripts/mrk-contract`, which lists the options that each script takes. It
+reads it once for each checkout, and again when the file changes. When a
+script does not take an option that Dipstick passes, the pane runs nothing and
+says that this mrk is older than Dipstick, with `make pull`, or, when the
+contract is a later version than Dipstick reads, that this Dipstick is older.
+A script that takes the option and exits 2 refuses the command line, and the
+pane shows mrk's own reason. With an mrk from before `mrk-contract`, a script
+that exits 2 and names an option Dipstick passes as unknown is an mrk older
+than Dipstick. Any other refusal shows mrk's own reason.
 
 **Dipstick never commits by itself.** The panes change files in the mrk
 checkout: `config/dock.txt`; the login-items list, through
@@ -197,6 +206,9 @@ Login Items. mrk's Phase 3 does both.
 - For the files that App Preferences shows as **not read**, and a login item
   whose name starts with a dash, mrk from 2026-10-28 on
   ([sevmorris/mrk#135](https://github.com/sevmorris/mrk/pull/135)).
+- For a pane to tell an option mrk lacks from a value mrk refuses before it
+  runs anything, mrk from 2026-10-29 on, with `scripts/mrk-contract`
+  ([sevmorris/mrk#140](https://github.com/sevmorris/mrk/pull/140)). An older mrk works as before.
 
 ## Build, test, look
 

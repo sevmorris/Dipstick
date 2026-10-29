@@ -84,6 +84,23 @@ final class StubMrk {
         try String(contentsOf: root.appendingPathComponent(path), encoding: .utf8)
     }
 
+    /// Gives the checkout a scripts/mrk-contract that logs its run, as a
+    /// script's stub does, and prints JSON, or exits with STATUS.
+    func contract(_ json: String, status: Int32 = 0) throws {
+        try write("fixtures/mrk-contract.json", json)
+        let url = root.appendingPathComponent("scripts/mrk-contract")
+        try """
+        #!/bin/bash
+        { printf 'scripts/mrk-contract'; printf ' [%s]' "$@"; printf ' cwd=%s\\n' "$PWD"; } >> "\(log.path)"
+        cat "\(root.path)/fixtures/mrk-contract.json"
+        exit \(status)
+        """.write(to: url, atomically: true, encoding: .utf8)
+        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: url.path)
+    }
+
+    /// The runs of scripts/mrk-contract in the log.
+    var contractCalls: Int { calls.filter { $0.hasPrefix("scripts/mrk-contract") }.count }
+
     /// What a run of SCRIPT with ARGS prints and exits with.
     func answer(_ script: String, _ args: [String], out: String = "", err: String = "", status: Int32 = 0) throws {
         let name = ([(script as NSString).lastPathComponent] + args).joined(separator: "_")

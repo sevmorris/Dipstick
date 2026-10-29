@@ -103,10 +103,30 @@ enum MrkCommand: Equatable, Sendable {
     /// A login item decision: the option and the name as two arguments, or as
     /// OPTION=NAME for a name that starts with a dash, which sync-login-items
     /// would otherwise take for an option. That form came with mrk from
-    /// 2026-10-28 (sevmorris/mrk#135); an older mrk says it does not know it,
-    /// and the pane says to run make pull.
+    /// 2026-10-28 (sevmorris/mrk#135); for an older mrk the pane says to run
+    /// make pull.
     private static func decision(_ option: String, _ name: String) -> [String] {
         name.hasPrefix("-") ? ["\(option)=\(name)"] : [option, name]
+    }
+
+    /// The options the command gives, by name, as mrk-contract lists them,
+    /// and whether each takes its value after an equals sign. MrkRunner checks
+    /// them against the checkout's contract before it runs the command.
+    var options: [(name: String, equals: Bool)] {
+        func plain(_ names: String...) -> [(name: String, equals: Bool)] { names.map { ($0, false) } }
+        func decision(_ option: String, _ name: String) -> [(name: String, equals: Bool)] {
+            [(option, name.hasPrefix("-"))]
+        }
+        switch self {
+        case .prefsCheck, .loginItemsCheck, .dockCheck: return plain("--check")
+        case .defaultsCheck(let trackpad): return trackpad ? plain("--check", "--with-trackpad") : plain("--check")
+        case .defaultsOff: return plain("--skip", "--revert")
+        case .defaultsOn: return plain("--unskip", "--key")
+        case .defaultsApply: return plain("--key")
+        case .loginItemsAdd(let name): return decision("--add", name)
+        case .loginItemsIgnore(let name): return decision("--ignore", name)
+        case .loginItemsRemove(let name): return decision("--remove", name)
+        }
     }
 
     /// The command as a pane shows it.
@@ -151,6 +171,9 @@ enum MrkError: LocalizedError, Equatable {
     case failed(command: String, status: Int32, message: String)
     case timedOut(command: String)
     case notStarted(command: String, message: String)
+    /// The checkout's mrk-contract does not list an option of the command,
+    /// so Dipstick did not run it.
+    case notTaken(command: String, message: String)
 
     var errorDescription: String? {
         switch self {
@@ -160,6 +183,8 @@ enum MrkError: LocalizedError, Equatable {
             return "\(command) did not finish, and Dipstick stopped it."
         case .notStarted(let command, let message):
             return "\(command) could not start: \(message)"
+        case .notTaken(_, let message):
+            return message
         }
     }
 
@@ -177,6 +202,12 @@ actor MrkRunner {
 
     private let environmentProvider: EnvironmentProvider
     private var environment: [String: String]?
+    /// The contract of each checkout, by its root's path, with the
+    /// modification date that scripts/mrk-contract had when it was read. A
+    /// pull that changes the file changes the date, and the next run reads it
+    /// again. A nil contract is a checkout with none, or one that could not
+    /// be read.
+    private var contracts: [String: (stamp: Date?, contract: MrkContract?)] = [:]
 
     init(environment: @escaping EnvironmentProvider) {
         self.environmentProvider = environment
@@ -195,10 +226,37 @@ actor MrkRunner {
         environment = nil
     }
 
+    /// The checkout's mrk-contract, run once and kept until the file changes,
+    /// or nil when the checkout has none or it did not answer with a document
+    /// Dipstick can read.
+    func contract(for checkout: MrkCheckout) async -> MrkContract? {
+        let url = checkout.file(MrkContract.script)
+        let stamp = (try? FileManager.default.attributesOfItem(atPath: url.path))?[.modificationDate] as? Date
+        if let kept = contracts[checkout.root.path], kept.stamp == stamp { return kept.contract }
+        var contract: MrkContract?
+        if stamp != nil, FileManager.default.isExecutableFile(atPath: url.path),
+           let result = try? await Subprocess.run(url, arguments: [], environment: await resolvedEnvironment(),
+                                                  currentDirectory: checkout.root, timeout: .seconds(30)),
+           !result.timedOut, result.status == 0 {
+            contract = try? MrkContract.decode(result.stdout)
+        }
+        contracts[checkout.root.path] = (stamp, contract)
+        return contract
+    }
+
     /// Runs the command in the checkout and returns its stdout. Throws when
     /// it exits non-zero, with the last line it wrote to stderr — where mrk's
-    /// scripts say why they refused.
+    /// scripts say why they refused. Throws without running it when the
+    /// checkout's mrk-contract does not list one of its options.
     func run(_ command: MrkCommand, in checkout: MrkCheckout) async throws -> ProcessResult {
+        let contract = await contract(for: checkout)
+        let missing = contract?.missing(command)
+        if let contract, let missing, !missing.isEmpty {
+            let options = missing.joined(separator: " ")
+            throw MrkError.notTaken(command: command.displayLine, message: contract.isNewer
+                ? "\(command.script) does not take \(options): this Dipstick is older than mrk. Choose Check for Updates… in Dipstick's menu."
+                : Self.olderMrk(command.script, options, checkout))
+        }
         let env = await resolvedEnvironment()
         let result: ProcessResult
         do {
@@ -213,22 +271,29 @@ actor MrkRunner {
         }
         if result.timedOut { throw MrkError.timedOut(command: command.displayLine) }
         guard result.status == 0 else {
-            // Each script exits 2 for a command line it refuses. When it names
-            // an option it does not know, the mrk is from before that option,
-            // since Dipstick passes only documented ones. Any other exit 2 is a
-            // value mrk refuses, such as a login item's name, and mrk's own
-            // reason says more than "run make pull" (sevmorris/mrk audit 22,
-            // Z-3).
-            let message = result.status == 2 && Self.refusesAnOption(result.stderrText)
-                ? "\(command.script) does not take \(command.arguments.joined(separator: " ")): this mrk is older than Dipstick. Run make pull in \(checkout.root.path)."
+            // Each script exits 2 for a command line it refuses. When the
+            // contract lists every option, that is a value mrk refuses, such
+            // as a login item's name, and mrk's own reason says why. With no
+            // contract that names the script, an mrk from before mrk-contract,
+            // an exit 2 that names an option as unknown is an mrk from before
+            // that option, since Dipstick passes only documented ones
+            // (sevmorris/mrk audit 22, Z-3 and O-2).
+            let message = result.status == 2 && missing == nil && Self.refusesAnOption(result.stderrText)
+                ? Self.olderMrk(command.script, command.arguments.joined(separator: " "), checkout)
                 : Self.reason(in: result.stderrText)
             throw MrkError.failed(command: command.displayLine, status: result.status, message: message)
         }
         return result
     }
 
+    /// What a pane says when SCRIPT does not take OPTIONS.
+    static func olderMrk(_ script: String, _ options: String, _ checkout: MrkCheckout) -> String {
+        "\(script) does not take \(options): this mrk is older than Dipstick. Run make pull in \(checkout.root.path)."
+    }
+
     /// Whether a script's stderr says it does not know an option: mrk's
-    /// "unknown argument: X", and sync-login-items' "Unknown option: X".
+    /// "unknown argument: X", and sync-login-items' "Unknown option: X". Read
+    /// only for a checkout whose mrk-contract does not name the script.
     static func refusesAnOption(_ stderr: String) -> Bool {
         let text = stderr.lowercased()
         return text.contains("unknown argument") || text.contains("unknown option")

@@ -6,6 +6,10 @@ Write a version's entry before releasing it, and put the same prose in `release-
 
 ## [Unreleased]
 
+**Added**
+- **Dipstick asks mrk which options its scripts take.** mrk from 2026-10-29 has `scripts/mrk-contract` ([sevmorris/mrk#140](https://github.com/sevmorris/mrk/pull/140)), which lists, as JSON, the options of each script that Dipstick runs. Dipstick reads it once for each checkout, and again when the file changes, before a pane runs a script. When the script does not take an option, the pane runs nothing and says that this mrk is older than Dipstick, with `make pull`; or, for a contract of a later version, that this Dipstick is older. When the script takes the option and still exits 2, the pane shows mrk's reason, and never says to run `make pull` ([sevmorris/mrk audit 22](https://github.com/sevmorris/mrk/blob/main/audit/22-audit-2026-10-28.md), O-2). With an mrk from before the command, Dipstick reads an exit 2 as 0.5 does.
+- **A later `mrk-status --json` schema is named.** A document whose schema is later than Dipstick reads, and that it cannot decode, says so, with Check for Updates…, where it said that the output could not be read.
+
 **Changed**
 - **The Login Items pane no longer says that Add and Remove change the manual.** mrk from 2026-10-29 keeps the list of login items in `config/login-items.txt` alone, and its manual links to the file ([sevmorris/mrk audit 22](https://github.com/sevmorris/mrk/blob/main/audit/22-audit-2026-10-28.md), D-3).
 
