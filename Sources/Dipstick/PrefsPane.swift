@@ -76,6 +76,7 @@ struct PrefsPane: View {
                 Button { confirmSnapshot = true } label: {
                     Label("Snapshot…", systemImage: "square.and.arrow.up.on.square")
                 }
+                .disabled(model.isDeciding)
                 .help("Run make snapshot-prefs in Dipstick's console")
             }
         }

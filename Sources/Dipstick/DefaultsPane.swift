@@ -113,12 +113,13 @@ struct DefaultsPane: View {
                 Toggle("Trackpad", isOn: $defaults.withTrackpad)
                     .toggleStyle(.checkbox)
                     .help("Compare the trackpad keys too, which make trackpad writes")
+                    .disabled(defaults.busy != nil)
                     .onChange(of: defaults.withTrackpad) { Task { await defaults.load() } }
                 RefreshButton(action: { await defaults.load() }, busy: defaults.phase.isLoading || defaults.busy != nil)
                 Button { confirmApply = true } label: {
                     Label("Apply All…", systemImage: "checkmark.seal")
                 }
-                .disabled(defaults.busy != nil)
+                .disabled(model.isDeciding)
                 .help("Run \(TerminalCommand.applyDefaults(withTrackpad: defaults.withTrackpad).command) in Dipstick's console")
             }
         }

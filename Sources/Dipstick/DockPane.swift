@@ -71,6 +71,7 @@ struct DockPane: View {
                 .help("Delete the selected item from config/dock.txt")
                 RefreshButton(action: dock.load, busy: dock.phase.isLoading)
                 Button { confirmApply = true } label: { Label("Apply…", systemImage: "dock.arrow.down.rectangle") }
+                    .disabled(model.isDeciding)
                     .help("Run make dock in Dipstick's console")
             }
         }
