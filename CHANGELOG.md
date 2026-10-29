@@ -13,6 +13,9 @@ Write a version's entry before releasing it, and put the same prose in `release-
 **Changed**
 - **The Login Items pane no longer says that Add and Remove change the manual.** mrk from 2026-10-29 keeps the list of login items in `config/login-items.txt` alone, and its manual links to the file ([sevmorris/mrk audit 22](https://github.com/sevmorris/mrk/blob/main/audit/22-audit-2026-10-28.md), D-3).
 
+**Developer**
+- `MrkText.swift` (it was `TSV.swift`), the reader of mrk's `--check` lines, and `ShellEnvironment.swift` are shared verbatim with Barkeep, and `scripts/check-shared.sh` compares them in each release preflight. Dipstick keeps its own `ShellEnvironment.capture`, beside `Subprocess`, which runs it.
+
 ## [0.5] — 2026-10-28
 
 **Added**

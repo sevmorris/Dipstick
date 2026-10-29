@@ -1,22 +1,31 @@
+// Shared verbatim across the sibling app repos (Dipstick, Barkeep). Keep the
+// copies byte-identical: scripts/check-shared.sh compares them and a release
+// preflight fails when they drift. Anything one app needs on its own belongs
+// in that app's files, not here.
+
 import Foundation
 
-/// The environment a new terminal window has, which is what mrk-status
-/// expects to run in.
+/// The environment a new terminal window has, which is what mrk's scripts
+/// expect to run in.
 ///
-/// An app started from Finder or at login gets launchd's bare PATH. mrk-status
-/// run with that finds no Homebrew on PATH, runs `scripts/sync` under the
-/// system bash, and reports ~/bin as missing from PATH when it is only missing
-/// from Dipstick's. So Dipstick asks an interactive login zsh what it sets up
-/// from ~/.zprofile and ~/.zshrc, and runs mrk-status with that.
+/// An app started from Finder or at login gets launchd's bare PATH. mrk's
+/// scripts run with that find no Homebrew on PATH: sync falls back to the
+/// system bash, the scripts look for gum, python3 and brew and do not find
+/// them, and mrk-status reports ~/bin as missing from PATH when it is only
+/// missing from the app's. So the app asks an interactive login zsh what it
+/// sets up from ~/.zprofile and ~/.zshrc, and runs mrk's scripts with that.
+///
+/// Each app asks with its own process runner, in a `capture` of its own
+/// beside that runner; what is here is the part that does not run anything.
 enum ShellEnvironment {
-    static let startMarker = "__DIPSTICK_ENV_START__"
-    static let endMarker = "__DIPSTICK_ENV_END__"
+    static let startMarker = "__MRK_SHELL_ENV_START__"
+    static let endMarker = "__MRK_SHELL_ENV_END__"
 
-    /// .zshrc prints to stdout as it loads (about 1.9 KB on this Mac), so the
-    /// dump sits between two markers. `env -0` ends each entry with a NUL, so a
-    /// value that holds a newline survives. scripts/check-updates, which .zshrc
-    /// runs, exits at once when stdin is not a terminal, and Subprocess gives
-    /// it /dev/null.
+    /// .zshrc can print to stdout as it loads (about 1.9 KB on the owner's
+    /// Mac), so the dump sits between two markers. `env -0` ends each entry
+    /// with a NUL, so a value that holds a newline survives. stdin is
+    /// /dev/null, so anything .zshrc runs that waits for a terminal finds
+    /// none: mrk's scripts/check-updates, which .zshrc runs, exits at once.
     static let script =
         "print -rn -- \(startMarker); /usr/bin/env -0; print -rn -- \(endMarker)"
 
@@ -30,9 +39,10 @@ enum ShellEnvironment {
         ].joined(separator: ":")
     }
 
-    /// Dipstick's own environment with the fallback PATH.
+    /// The app's own environment with the fallback PATH, and HOME.
     static func fallback(base: [String: String], home: String) -> [String: String] {
         var env = base
+        env["HOME"] = home
         env["PATH"] = fallbackPath(home: home)
         return env
     }
@@ -52,19 +62,5 @@ enum ShellEnvironment {
             env[String(text[..<eq])] = String(text[text.index(after: eq)...])
         }
         return env.isEmpty ? nil : env
-    }
-
-    /// Asks the shell, or returns nil when it fails, hangs past `timeout`, or
-    /// prints no markers.
-    static func capture(
-        shell: String = "/bin/zsh",
-        timeout: Duration = .seconds(15)
-    ) async -> [String: String]? {
-        guard let result = try? await Subprocess.run(
-            URL(fileURLWithPath: shell),
-            arguments: ["-i", "-l", "-c", script],
-            timeout: timeout
-        ), !result.timedOut else { return nil }
-        return parse(result.stdout)
     }
 }
