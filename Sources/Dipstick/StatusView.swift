@@ -267,17 +267,22 @@ private struct FixButton: View {
     let command: String
     let model: StatusModel
 
-    private var route: FixRoute? { FixRoute.route(for: command) }
+    private var inBarkeep: Bool { model.opensInBarkeep(command) }
+    private var route: FixRoute? { inBarkeep ? nil : FixRoute.route(for: command) }
     private var inTerminal: Bool { model.needsTerminal(command) }
     /// The console takes one command at a time, and waits for a pane's
     /// decision.
-    private var waiting: Bool { route == nil && !inTerminal && model.isBusy }
+    private var waiting: Bool { !inBarkeep && route == nil && !inTerminal && model.isBusy }
 
     var body: some View {
         Button {
             model.run(command)
         } label: {
-            if let route {
+            if inBarkeep {
+                Label("Barkeep…", systemImage: "shippingbox")
+                    .font(.caption)
+                    .lineLimit(1)
+            } else if let route {
                 Label(route.pane.title + "…", systemImage: route.pane.symbol)
                     .font(.caption)
                     .lineLimit(1)
@@ -291,7 +296,8 @@ private struct FixButton: View {
         .controlSize(.small)
         .frame(maxWidth: 170, alignment: .trailing)
         .disabled(waiting)
-        .help(route.map { "Open \($0.pane.title) in mrk Settings, which shows what \(command) would change" }
+        .help(inBarkeep ? "Open Barkeep's Untracked list, which adds, adopts or ignores each package with sync, in place of \(command)"
+              : route.map { "Open \($0.pane.title) in mrk Settings, which shows what \(command) would change" }
               ?? (waiting ? "A command is running in the console, or a pane is making a change"
                   : inTerminal ? "Run \(command) in a terminal: it draws a full-screen picker"
                   : "Run \(command) in Dipstick's console"))
