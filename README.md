@@ -46,7 +46,13 @@ and runs nothing until you ask:
 | `make dock` | Dock |
 
 Three things draw a full-screen picker, which the console cannot show:
-`make sync ARGS=-c`, `make brew` and the mrk-menu button. They open a terminal.
+`make sync ARGS=--push`, `make brew` and the mrk-menu button. They open a terminal.
+
+With Barkeep 1.17.0 or later installed, in `/Applications` or
+`~/Applications`, the fix for a package the Brewfile lacks, `make sync`, is a
+**Barkeep…** button instead. A click opens Barkeep's Untracked list, where each
+package is added, adopted or ignored with mrk's `sync`. Dipstick opens the
+installed copy by its path, never a build of Barkeep elsewhere.
 
 **Settings…** opens mrk Settings at the pane it showed last.
 

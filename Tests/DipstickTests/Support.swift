@@ -140,10 +140,14 @@ final class StubMrk {
 
     /// A model over this checkout, with no window, no login shell asked, and
     /// mrk Settings' store in this folder.
+    /// No Barkeep, unless the test gives one, so a test never opens the real
+    /// one.
     @MainActor
-    func model() -> StatusModel {
+    func model(findBarkeep: @escaping @MainActor () -> URL? = { nil },
+               openInBarkeep: @escaping @MainActor (URL) -> Void = { _ in }) -> StatusModel {
         let env = ["PATH": "/usr/bin:/bin", "HOME": dir.path, "MRK_ROOT": root.path,
                    "DIPSTICK_MRK_STATUS": mrkStatus.path]
-        return StatusModel(home: dir.path, opensWindows: false, environment: { env }, settingsStore: store())
+        return StatusModel(home: dir.path, opensWindows: false, environment: { env }, settingsStore: store(),
+                           findBarkeep: findBarkeep, openInBarkeep: openInBarkeep)
     }
 }

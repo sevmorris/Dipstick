@@ -24,6 +24,10 @@ final class StatusModel {
     /// The Make targets whose fixes run in a terminal, as the checkout's
     /// mrk-contract names them, read at each refresh (TerminalLauncher).
     private(set) var terminalTargets = TerminalLauncher.fullScreenTargets
+    /// The installed Barkeep that opens its Untracked list from a link, found
+    /// at each refresh: the fix for a package that the Brewfile lacks goes
+    /// there (BarkeepLink). Nil without one.
+    private(set) var barkeepApp: URL?
     /// Runs mrk's scripts for mrk Settings, and keeps each checkout's
     /// contract, which the refresh reads too.
     @ObservationIgnored private(set) lazy var runner = MrkRunner(environment: { [weak self] in
@@ -41,6 +45,10 @@ final class StatusModel {
     /// Where the settings window keeps what it stores: the app's own store,
     /// unless a test gives its own.
     private let settingsStore: UserDefaults
+    /// Finds Barkeep, and opens a link in it: LaunchServices and NSWorkspace,
+    /// unless a test gives its own.
+    private let findBarkeep: @MainActor () -> URL?
+    private let openInBarkeep: @MainActor (URL) -> Void
     /// Set when a fix ends while mrk-status runs. That run read mrk as it
     /// was, so it goes round again.
     @ObservationIgnored private var changedDuringRefresh = false
@@ -61,11 +69,15 @@ final class StatusModel {
     /// `environment` is what mrk-status and the console run with: the login
     /// shell's, unless a test gives its own.
     init(home: String = NSHomeDirectory(), opensWindows: Bool = true,
-         environment: EnvironmentProvider? = nil, settingsStore: UserDefaults = .app) {
+         environment: EnvironmentProvider? = nil, settingsStore: UserDefaults = .app,
+         findBarkeep: (@MainActor () -> URL?)? = nil,
+         openInBarkeep: @escaping @MainActor (URL) -> Void = { BarkeepLink.open(in: $0) }) {
         self.home = home
         self.opensWindows = opensWindows
         self.settingsStore = settingsStore
         self.environmentProvider = environment ?? { await Self.loginShellEnvironment(home: home) }
+        self.findBarkeep = findBarkeep ?? { BarkeepLink.installedApp(home: home) }
+        self.openInBarkeep = openInBarkeep
     }
 
     /// What a terminal window on this Mac has, or Dipstick's own environment
@@ -138,6 +150,7 @@ final class StatusModel {
             // Before the report, so its fix buttons show where they run. A
             // make pull that changes mrk-contract changes the targets.
             terminalTargets = TerminalLauncher.targets(in: await runner.contract(for: checkout))
+            barkeepApp = findBarkeep()
 
             switch await StatusRunner.fetch(environment: environment ?? [:], home: home) {
             case .success(let fresh):
@@ -176,12 +189,24 @@ final class StatusModel {
         TerminalLauncher.isNeeded(for: command, targets: terminalTargets)
     }
 
+    /// Whether Barkeep makes `command`'s fix in its Untracked list: the fix is
+    /// `make sync`, and an installed Barkeep opens the list from its link.
+    func opensInBarkeep(_ command: String) -> Bool {
+        barkeepApp != nil && BarkeepLink.makes(command)
+    }
+
     /// Runs `command` in the checkout, as the TUI's `f` does: in Dipstick's
     /// console, or in a terminal for the few fixes that draw a full screen
     /// (`needsTerminal`). A fix asks first, as `f` does. A fix that a pane of
     /// mrk Settings makes instead (FixRoute) opens that pane: it shows what
-    /// the fix would change, and runs nothing until asked.
+    /// the fix would change, and runs nothing until asked. So does the fix
+    /// that Barkeep makes (`opensInBarkeep`): it opens Barkeep's Untracked
+    /// list.
     func run(_ command: String, confirm: Bool = true) {
+        if opensInBarkeep(command), let app = barkeepApp {
+            openInBarkeep(app)
+            return
+        }
         if let route = FixRoute.route(for: command) {
             openSettings(route.pane, withTrackpad: route.withTrackpad)
             return
