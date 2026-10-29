@@ -65,11 +65,11 @@ enum MrkCommand: Equatable, Sendable {
     case defaultsApply([DefaultsKey])
     /// The login items an interactive run would offer.
     case loginItemsCheck
-    /// Track a login item in config/login-items.txt and the manual.
+    /// Track a login item in config/login-items.txt.
     case loginItemsAdd(String)
     /// Add a login item to ~/.mrk/login-items-ignore.
     case loginItemsIgnore(String)
-    /// Stop tracking an app in config/login-items.txt and the manual.
+    /// Stop tracking an app in config/login-items.txt.
     case loginItemsRemove(String)
     /// Each item of config/dock.txt: app or folder, line, path, state, and
     /// whether it is docked; then each unlisted item the Dock has.

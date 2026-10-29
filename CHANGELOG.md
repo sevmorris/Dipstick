@@ -4,6 +4,11 @@ All notable changes to Dipstick are documented here. Every released version has 
 
 Write a version's entry before releasing it, and put the same prose in `release-notes/v<version>.md`: `release.sh` publishes that file as the release's notes, and stops before building anything when it is absent.
 
+## [Unreleased]
+
+**Changed**
+- **The Login Items pane no longer says that Add and Remove change the manual.** mrk from 2026-10-29 keeps the list of login items in `config/login-items.txt` alone, and its manual links to the file ([sevmorris/mrk audit 22](https://github.com/sevmorris/mrk/blob/main/audit/22-audit-2026-10-28.md), D-3).
+
 ## [0.5] — 2026-10-28
 
 **Added**

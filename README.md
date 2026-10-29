@@ -80,7 +80,7 @@ passes as unknown is an mrk older than Dipstick, and the pane says to run
 `make pull`. Any other refusal shows mrk's own reason.
 
 **Dipstick never commits by itself.** The panes change files in the mrk
-checkout: `config/dock.txt`; the login-items list and the manual, through
+checkout: `config/dock.txt`; the login-items list, through
 `sync-login-items`; and the skip list, through `defaults.sh`. Committing stays
 with `mrk-push` and `pushall`, with their secret scan and gates, and the
 Unrecorded panel shows what is waiting. Barkeep works the same way. After each
