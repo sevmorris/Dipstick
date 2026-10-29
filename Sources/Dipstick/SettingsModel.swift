@@ -100,8 +100,14 @@ final class SettingsModel {
 
     /// Runs a command in Dipstick's console, which reads the command's pane
     /// again, and runs mrk-status again, once it has exited. One at a time:
-    /// while one runs, this brings the console to the front instead.
+    /// while one runs, this brings the console to the front instead. Not
+    /// while a switch or a login item decision runs: make dock would restart
+    /// the Dock while a switch's defaults.sh restarts it, and make
+    /// snapshot-prefs would export a domain half changed. The panes' buttons
+    /// wait for it; this holds a dialog that was open before it began
+    /// (sevmorris/mrk audit 22, Z-7).
     func runInConsole(_ command: TerminalCommand) async {
+        guard !isDeciding else { return }
         await host?.runInConsole(command.command, pane: command.pane)
     }
 }
@@ -123,7 +129,25 @@ final class PrefsModel {
         self.runner = runner
     }
 
-    var changeCount: Int { groups.reduce(0) { $0 + $1.changes.count } }
+    var changeCount: Int { groups.reduce(0) { $0 + $1.changes.filter { $0.kind != .unread }.count } }
+    var unreadCount: Int { groups.reduce(0) { $0 + $1.changes.filter { $0.kind == .unread }.count } }
+
+    /// What the pane's title bar says under its title.
+    var subtitle: String {
+        var text = "\(changeCount) change(s) in \(groups.count) app(s)"
+        if unreadCount > 0 { text += ", \(unreadCount) not read" }
+        return text
+    }
+
+    /// What the pane says over the list, for COUNT files the run could not
+    /// read. Full Disk Access holds the narrower permission to get the data
+    /// of other apps, and is the one that System Settings lists.
+    static func unreadMessage(_ count: Int) -> String {
+        let files = count == 1 ? "1 file" : "\(count) files"
+        return "snapshot-prefs could not read \(files), so a change in them is not known, and the snapshot keeps the saved copy. "
+            + "Its export failed, or macOS did not let Dipstick read the app's container: "
+            + "turn Dipstick on under Full Disk Access, and let macOS quit and reopen it."
+    }
 
     func load() async {
         phase = .loading
@@ -327,7 +351,11 @@ final class LoginItemsModel {
         } catch let error as MrkError where error.status == 1 {
             rows = []
             if case .failed(_, _, let message) = error {
-                phase = .failed(Self.refusalMessage(message))
+                // Exit 1 is also a bad line in config/login-items.txt, a file
+                // it cannot read, or another run holding the list's lock.
+                // Automation is the advice only when System Events failed.
+                let systemEvents = message.contains("System Events") || message.contains("osascript")
+                phase = .failed(systemEvents ? Self.refusalMessage(message) : message)
             }
         } catch {
             phase = .failed(error.localizedDescription)
@@ -341,6 +369,9 @@ final class LoginItemsModel {
         case .ignore: command = .loginItemsIgnore(row.name)
         case .remove: command = .loginItemsRemove(row.name)
         }
+        // Set before the first await, as the Defaults pane's decide does: two
+        // clicks before the first task ran both reached sync-login-items.
+        guard busy == nil else { return }
         busy = row.name
         defer { busy = nil }
         do {

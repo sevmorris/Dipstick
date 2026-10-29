@@ -60,7 +60,7 @@ final class PseudoTerminal: @unchecked Sendable {
         let argv = CStringArray([executable] + arguments)
         let envp = CStringArray(environment.keys.sorted().map { "\($0)=\(environment[$0]!)" })
         // The child's errors name the app, as a shell's name the shell:
-        // "gearbox: cannot enter …".
+        // "dipstick: cannot enter …".
         let name = ProcessInfo.processInfo.processName.lowercased()
         let strings = CStringArray([directory, "\(name): cannot enter \(directory)\r\n",
                                     "\(name): cannot run \(executable)\r\n"])

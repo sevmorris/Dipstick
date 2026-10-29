@@ -13,6 +13,19 @@ struct PrefsPane: View {
             PaneNote(text: "The changes the next snapshot would commit to mrk-prefs, from snapshot-prefs --check. "
                      + "It exports into a scratch copy and changes nothing. Keys that change on their own are left out.")
             Divider()
+            if prefs.phase == .loaded && prefs.unreadCount > 0 {
+                HStack(spacing: 12) {
+                    Label(PrefsModel.unreadMessage(prefs.unreadCount), systemImage: "lock.fill")
+                        .foregroundStyle(.orange)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    Button("Open Full Disk Access…") { FullDiskAccess.open() }
+                        .fixedSize()
+                        .help("Open System Settings → Privacy & Security → Full Disk Access")
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 16).padding(.vertical, 8)
+                Divider()
+            }
             PhaseView(phase: prefs.phase, retry: prefs.load) {
                 if prefs.groups.isEmpty {
                     ContentUnavailableView("Nothing to snapshot", systemImage: "checkmark.circle",
@@ -56,13 +69,14 @@ struct PrefsPane: View {
             }
         }
         .navigationTitle("App Preferences")
-        .navigationSubtitle(prefs.phase == .loaded ? "\(prefs.changeCount) change(s) in \(prefs.groups.count) app(s)" : "")
+        .navigationSubtitle(prefs.phase == .loaded ? prefs.subtitle : "")
         .toolbar {
             ToolbarItemGroup {
                 RefreshButton(action: prefs.load, busy: prefs.phase.isLoading)
                 Button { confirmSnapshot = true } label: {
                     Label("Snapshot…", systemImage: "square.and.arrow.up.on.square")
                 }
+                .disabled(model.isDeciding)
                 .help("Run make snapshot-prefs in Dipstick's console")
             }
         }
@@ -80,6 +94,7 @@ struct PrefsPane: View {
         case .added: return Badge(text: "added", color: .green)
         case .deleted: return Badge(text: "deleted", color: .red)
         case .changed: return Badge(text: "changed", color: .orange)
+        case .unread: return Badge(text: "not read", color: .gray)
         }
     }
 }

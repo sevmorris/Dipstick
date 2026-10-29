@@ -7,6 +7,15 @@ final class TSVTests: XCTestCase {
         XCTAssertEqual(MrkText.unescape("plain"), "plain")
     }
 
+    /// mrk_check_line writes a tab before an accent as \t and the accent, and a
+    /// backslash before one as \\ and the accent. As Characters the escape
+    /// and the accent are one, and the line was passed over.
+    func testAnEscapeBeforeACombiningMarkIsUndone() {
+        XCTAssertEqual(MrkText.unescape("x\\t\u{0301}y"), "x\t\u{0301}y")
+        XCTAssertEqual(MrkText.unescape("x\\\\\u{0301}"), "x\\\u{0301}")
+        XCTAssertEqual(MrkText.fields("a\\t\u{0301}\tb"), ["a\t\u{0301}", "b"])
+    }
+
     func testABackslashBeforeAnythingElseIsRefused() {
         XCTAssertNil(MrkText.unescape(#"C:\qtemp"#))
         XCTAssertNil(MrkText.unescape(#"ends\"#))
@@ -90,6 +99,19 @@ final class PrefsDiffTests: XCTestCase {
         ])
         let table = AppPrefsTable.parse(try Fixture.text("mrk-122/app-prefs.tsv"))
         XCTAssertFalse(table.names.isEmpty)
+    }
+
+    /// mrk from #135 shows a file it could not read as unread. Captured with
+    /// macOS refusing Keka's container to the run.
+    func testTheRealCheckWithAFileNotRead() throws {
+        let changes = PrefChange.parse(try Fixture.text("mrk-135/snapshot-prefs--check-unread.out"))
+        XCTAssertEqual(changes, [
+            PrefChange(file: "repos.tsv", key: "", kind: .added),
+            PrefChange(file: "Keka.plist", key: "", kind: .unread),
+        ])
+        let groups = PrefGroup.group(changes, table: AppPrefsTable.parse(try Fixture.text("mrk-122/app-prefs.tsv")))
+        XCTAssertEqual(groups.map(\.name), ["repos.tsv", "Keka"])
+        XCTAssertEqual(PrefGroup.label(of: groups[1].changes[0], in: groups[1]), "The whole file")
     }
 
     func testGroupsByTheTablesNameThenByDirectory() {
@@ -415,7 +437,7 @@ final class DockListTests: XCTestCase {
         let mode = try FileManager.default.attributesOfItem(atPath: stub.checkout.dockList.path)[.posixPermissions] as? Int
         XCTAssertEqual(mode, 0o644)
         let leftovers = try FileManager.default.contentsOfDirectory(atPath: stub.root.appendingPathComponent("config").path)
-            .filter { $0.contains("gearbox") }
+            .filter { $0.hasPrefix(".dock.txt.") }
         XCTAssertEqual(leftovers, [])
     }
 

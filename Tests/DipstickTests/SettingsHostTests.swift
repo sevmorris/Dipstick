@@ -100,6 +100,24 @@ final class SettingsHostTests: XCTestCase {
         XCTAssertNil(model.console)
     }
 
+    /// While a switch or a login item decision runs, a pane's console command
+    /// does not start: make dock would restart the Dock beside the switch's
+    /// own restart (sevmorris/mrk audit 22, Z-7).
+    func testAPanesCommandWaitsForADecision() async throws {
+        let stub = try StubMrk()
+        try stub.write("Makefile", "dock:\n\t@echo docked\n")
+        let model = stub.model()
+        let settings = await model.settingsModel()
+
+        settings.defaults.busy = "com.apple.dock tilesize"
+        await settings.runInConsole(.applyDock)
+        XCTAssertNil(model.console)
+        settings.defaults.busy = nil
+        await settings.runInConsole(.applyDock)
+        XCTAssertEqual(model.console?.command, "make dock")
+        model.closeConsole()
+    }
+
     func testAFailureIsItsStatusAndThePaneStillReads() async throws {
         let stub = try StubMrk()
         try stub.write("Makefile", "snapshot-prefs:\n\t@echo refused >&2; exit 1\n")
