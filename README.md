@@ -98,8 +98,10 @@ than Dipstick. Any other refusal shows mrk's own reason.
 checkout: `config/dock.txt`; the login-items list, through
 `sync-login-items`; and the skip list, through `defaults.sh`. Committing stays
 with `mrk-push` and `pushall`, with their secret scan and gates, and the
-Unrecorded panel shows what is waiting. Barkeep works the same way. After each
-change, Dipstick runs `mrk-status` again.
+Unrecorded panel shows what is waiting. Barkeep's own edits wait the same way.
+The one fix that commits is mrk's: `make sync ARGS=--push` in a terminal, or,
+with Barkeep 1.16.0 or later and its Commit and Push setting on, Barkeep's add,
+which runs `sync --push`. After each change, Dipstick runs `mrk-status` again.
 
 While mrk Settings or the console is open, Dipstick has a Dock icon and a menu
 bar: **Check for Updates…** and **mrk Settings…** (⌘,) in the Dipstick menu,
