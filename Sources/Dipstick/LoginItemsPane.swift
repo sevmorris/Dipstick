@@ -9,7 +9,7 @@ struct LoginItemsPane: View {
     var body: some View {
         VStack(spacing: 0) {
             PaneNote(text: "The apps mrk starts at login, against this Mac's login items, from sync-login-items --check. "
-                     + "Add and Remove change config/login-items.txt and the manual; Ignore adds the app to "
+                     + "Add and Remove change config/login-items.txt; Ignore adds the app to "
                      + "~/.mrk/login-items-ignore. None of them changes this Mac's login items, and none commits.")
             Divider()
             if let error = items.decisionError {
