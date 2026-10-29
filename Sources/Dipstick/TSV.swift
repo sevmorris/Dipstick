@@ -14,10 +14,16 @@ enum MrkText {
     /// line of any of the five --check modes, with its escapes undone: \t is
     /// a tab, \n a newline and \\ a backslash. nil for a backslash before
     /// anything else, which mrk never writes.
+    ///
+    /// By Unicode scalar, not by Character: a backslash, or the t or n after
+    /// it, joins a combining mark that follows into one Character, which then
+    /// equals neither. mrk writes such a field for a tab or a backslash before
+    /// an accent, and until 0.5 the line holding it was passed over
+    /// (sevmorris/mrk audit 22, Z-5).
     static func unescape(_ field: Substring) -> String? {
-        guard field.contains("\\") else { return String(field) }
-        var out = ""
-        var it = field.makeIterator()
+        guard field.unicodeScalars.contains("\\") else { return String(field) }
+        var out = String.UnicodeScalarView()
+        var it = field.unicodeScalars.makeIterator()
         while let c = it.next() {
             guard c == "\\" else { out.append(c); continue }
             switch it.next() {
@@ -27,7 +33,7 @@ enum MrkText {
             default: return nil
             }
         }
-        return out
+        return String(out)
     }
 
     /// The fields of one line, split at every tab, each with its escapes
@@ -35,8 +41,8 @@ enum MrkText {
     /// bad escape.
     static func fields(_ line: Substring) -> [String]? {
         var fields: [String] = []
-        for field in line.split(separator: "\t", omittingEmptySubsequences: false) {
-            guard let text = unescape(field) else { return nil }
+        for field in line.unicodeScalars.split(separator: "\t", omittingEmptySubsequences: false) {
+            guard let text = unescape(Substring(field)) else { return nil }
             fields.append(text)
         }
         return fields

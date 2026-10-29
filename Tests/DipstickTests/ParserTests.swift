@@ -7,6 +7,15 @@ final class TSVTests: XCTestCase {
         XCTAssertEqual(MrkText.unescape("plain"), "plain")
     }
 
+    /// mrk_check_line writes a tab before an accent as \t and the accent, and a
+    /// backslash before one as \\ and the accent. As Characters the escape
+    /// and the accent are one, and the line was passed over.
+    func testAnEscapeBeforeACombiningMarkIsUndone() {
+        XCTAssertEqual(MrkText.unescape("x\\t\u{0301}y"), "x\t\u{0301}y")
+        XCTAssertEqual(MrkText.unescape("x\\\\\u{0301}"), "x\\\u{0301}")
+        XCTAssertEqual(MrkText.fields("a\\t\u{0301}\tb"), ["a\t\u{0301}", "b"])
+    }
+
     func testABackslashBeforeAnythingElseIsRefused() {
         XCTAssertNil(MrkText.unescape(#"C:\qtemp"#))
         XCTAssertNil(MrkText.unescape(#"ends\"#))
