@@ -12,6 +12,10 @@ final class CommandTests: XCTestCase {
             (.loginItemsAdd("Chrono Plus"), "scripts/sync-login-items", ["--add", "Chrono Plus"]),
             (.loginItemsIgnore("Raycast"), "scripts/sync-login-items", ["--ignore", "Raycast"]),
             (.loginItemsRemove("Old"), "scripts/sync-login-items", ["--remove", "Old"]),
+            // A name that starts with a dash, which --add NAME would take for an option
+            (.loginItemsAdd("-Dash App"), "scripts/sync-login-items", ["--add=-Dash App"]),
+            (.loginItemsIgnore("-x"), "scripts/sync-login-items", ["--ignore=-x"]),
+            (.loginItemsRemove("-x"), "scripts/sync-login-items", ["--remove=-x"]),
             (.dockCheck, "scripts/dock-setup", ["--check"]),
             (.defaultsOff([DefaultsKey(domain: "com.apple.dock", key: "tilesize")]), "scripts/defaults.sh",
              ["--skip", "com.apple.dock", "tilesize", "--revert", "com.apple.dock", "tilesize"]),
@@ -135,6 +139,33 @@ final class RunnerTests: XCTestCase {
             XCTAssertTrue(error.errorDescription!.contains("older than Dipstick"), error.errorDescription!)
             XCTAssertTrue(error.errorDescription!.contains("make pull"))
         }
+    }
+
+    /// mrk exits 2 for a value it refuses, too, and then its reason is the
+    /// message, not "run make pull" (sevmorris/mrk audit 22, Z-3).
+    func testExitTwoForAValueIsMrksReason() async throws {
+        let stub = try StubMrk()
+        try stub.answer("sync-login-items", ["--add", "Two"],
+                        err: "  ✗ Not a login-item name: 'Two'.\n    Run sync-login-items --help for the options.\n",
+                        status: 2)
+        do {
+            _ = try await stub.runner().run(.loginItemsAdd("Two"), in: stub.checkout)
+            XCTFail("expected a refusal")
+        } catch let error as MrkError {
+            XCTAssertEqual(error.status, 2)
+            XCTAssertEqual(error.errorDescription, "Not a login-item name: 'Two'.")
+        }
+        XCTAssertTrue(MrkRunner.refusesAnOption("  ✗ Unknown option: --add=-x\n"))
+        XCTAssertTrue(MrkRunner.refusesAnOption("usage\n\nunknown argument: --check\n"))
+        XCTAssertFalse(MrkRunner.refusesAnOption("  ✗ --add needs a login-item name.\n"))
+    }
+
+    /// The reason is the line mrk marked ✗, not a hint that info printed below it.
+    func testTheReasonIsTheMarkedLine() {
+        XCTAssertEqual(MrkRunner.reason(in: "  ✗ Could not read system login items — osascript exited 1.\n"
+                                           + "    System Events may be unavailable\n    (System Settings → Automation).\n"),
+                       "Could not read system login items — osascript exited 1.")
+        XCTAssertEqual(MrkRunner.reason(in: "plain last line\n"), "plain last line")
     }
 
     func testTheEnvironmentIsAskedForOnce() async throws {

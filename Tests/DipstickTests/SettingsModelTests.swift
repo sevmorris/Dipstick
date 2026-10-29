@@ -208,6 +208,22 @@ final class ModelTests: XCTestCase {
         XCTAssertEqual(model.rows, [])
     }
 
+    /// Exit 1 for another reason, such as a bad line in the list, is shown as
+    /// mrk says it, with no advice about Automation (sevmorris/mrk audit 22).
+    func testLoginItemsShowAnotherRefusalAsMrkSaysIt() async throws {
+        let stub = try StubMrk()
+        try stub.write("config/login-items.txt", "Applications/AlDente.app\n")
+        try stub.answer("sync-login-items", ["--check"],
+                        err: "Not an app path: Applications/AlDente.app\n"
+                            + "  ✗ config/login-items.txt has a line that sync-login-items cannot use (see above).\n"
+                            + "    Each line is the full path of one app, ending in .app, and each app is listed once.\n",
+                        status: 1)
+        let model = LoginItemsModel(checkout: stub.checkout, runner: stub.runner())
+        await model.load()
+        guard case .failed(let message) = model.phase else { return XCTFail("expected the refusal, got \(model.phase)") }
+        XCTAssertEqual(message, "config/login-items.txt has a line that sync-login-items cannot use (see above).")
+    }
+
     func testALoginItemDecisionRunsItsFlagThenChecksAgain() async throws {
         let stub = try StubMrk()
         try stub.write("config/login-items.txt", "/Applications/AlDente.app\n")

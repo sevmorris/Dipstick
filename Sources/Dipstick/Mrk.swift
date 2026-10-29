@@ -93,11 +93,20 @@ enum MrkCommand: Equatable, Sendable {
         case .defaultsOn(let keys): return keys.flatMap { ["--unskip", $0.domain, $0.key, "--key", $0.domain, $0.key] }
         case .defaultsApply(let keys): return keys.flatMap { ["--key", $0.domain, $0.key] }
         case .loginItemsCheck: return ["--check"]
-        case .loginItemsAdd(let name): return ["--add", name]
-        case .loginItemsIgnore(let name): return ["--ignore", name]
-        case .loginItemsRemove(let name): return ["--remove", name]
+        case .loginItemsAdd(let name): return Self.decision("--add", name)
+        case .loginItemsIgnore(let name): return Self.decision("--ignore", name)
+        case .loginItemsRemove(let name): return Self.decision("--remove", name)
         case .dockCheck: return ["--check"]
         }
+    }
+
+    /// A login item decision: the option and the name as two arguments, or as
+    /// OPTION=NAME for a name that starts with a dash, which sync-login-items
+    /// would otherwise take for an option. That form came with mrk from
+    /// 2026-10-28 (sevmorris/mrk#135); an older mrk says it does not know it,
+    /// and the pane says to run make pull.
+    private static func decision(_ option: String, _ name: String) -> [String] {
+        name.hasPrefix("-") ? ["\(option)=\(name)"] : [option, name]
     }
 
     /// The command as a pane shows it.
@@ -208,14 +217,37 @@ actor MrkRunner {
         }
         if result.timedOut { throw MrkError.timedOut(command: command.displayLine) }
         guard result.status == 0 else {
-            // Each script exits 2 for an option it does not know, and Dipstick
-            // passes only documented ones, so 2 means an mrk from before them.
-            let message = result.status == 2
+            // Each script exits 2 for a command line it refuses. When it names
+            // an option it does not know, the mrk is from before that option,
+            // since Dipstick passes only documented ones. Any other exit 2 is a
+            // value mrk refuses, such as a login item's name, and mrk's own
+            // reason says more than "run make pull" (sevmorris/mrk audit 22,
+            // Z-3).
+            let message = result.status == 2 && Self.refusesAnOption(result.stderrText)
                 ? "\(command.script) does not take \(command.arguments.joined(separator: " ")): this mrk is older than Dipstick. Run make pull in \(checkout.root.path)."
-                : Self.lastLine(of: result.stderrText)
+                : Self.reason(in: result.stderrText)
             throw MrkError.failed(command: command.displayLine, status: result.status, message: message)
         }
         return result
+    }
+
+    /// Whether a script's stderr says it does not know an option: mrk's
+    /// "unknown argument: X", and sync-login-items' "Unknown option: X".
+    static func refusesAnOption(_ stderr: String) -> Bool {
+        let text = stderr.lowercased()
+        return text.contains("unknown argument") || text.contains("unknown option")
+    }
+
+    /// Why a script refused: the last line lib.sh's err marked ✗, which comes
+    /// before the hints that info adds below it, or else the last line.
+    static func reason(in stderr: String) -> String {
+        let plain = stderr.replacingOccurrences(of: "\u{1B}\\[[0-9;]*m", with: "", options: .regularExpression)
+        if let marked = plain.split(separator: "\n").last(where: {
+            $0.trimmingCharacters(in: .whitespaces).hasPrefix("✗ ")
+        }) {
+            return lastLine(of: String(marked))
+        }
+        return lastLine(of: stderr)
     }
 
     /// The last line with text in it, with mrk's ✗/⚠ marks and colour codes

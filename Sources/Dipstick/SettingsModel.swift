@@ -327,7 +327,11 @@ final class LoginItemsModel {
         } catch let error as MrkError where error.status == 1 {
             rows = []
             if case .failed(_, _, let message) = error {
-                phase = .failed(Self.refusalMessage(message))
+                // Exit 1 is also a bad line in config/login-items.txt, a file
+                // it cannot read, or another run holding the list's lock.
+                // Automation is the advice only when System Events failed.
+                let systemEvents = message.contains("System Events") || message.contains("osascript")
+                phase = .failed(systemEvents ? Self.refusalMessage(message) : message)
             }
         } catch {
             phase = .failed(error.localizedDescription)
