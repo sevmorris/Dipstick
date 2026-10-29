@@ -280,8 +280,9 @@ entitlement, or the bundle lacks `NSAppleEventsUsageDescription`. An ad hoc
 build from `build.sh` has no hardened runtime, so it cannot show this fault.
 
 `tools/dmg/` and `scripts/check-shared.sh` are shared verbatim with the sibling
-apps, and `release.sh` stops when they differ. Change them in every repository
-at once.
+apps, and `Sources/Dipstick/MrkText.swift` and `ShellEnvironment.swift` with
+Barkeep, and `release.sh` stops when they differ. Change them in every
+repository at once.
 
 ## License
 

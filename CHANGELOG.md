@@ -14,6 +14,9 @@ Write a version's entry before releasing it, and put the same prose in `release-
 - **mrk names the fixes that need a terminal.** mrk from 2026-10-29 lists, in `scripts/mrk-contract`, the Make targets whose scripts can start `gum`, `mrk-picker` or `mrk-menu` ([sevmorris/mrk#142](https://github.com/sevmorris/mrk/pull/142)). Dipstick reads the list with the rest of the contract at each refresh, and sends a fix for one of those targets to Terminal; every other fix runs in the console. So a new mrk target that starts a picker opens a terminal, where Dipstick's console could not show it. mrk's tests hold the list to its Makefile and to the scripts that each target runs ([sevmorris/mrk audit 22](https://github.com/sevmorris/mrk/blob/main/audit/22-audit-2026-10-28.md), opportunity 5). With an mrk whose contract has no list, Dipstick sends `make sync`, `make sync-login-items` and `make brew` to Terminal, as 0.5 does.
 - **The Login Items pane no longer says that Add and Remove change the manual.** mrk from 2026-10-29 keeps the list of login items in `config/login-items.txt` alone, and its manual links to the file ([sevmorris/mrk audit 22](https://github.com/sevmorris/mrk/blob/main/audit/22-audit-2026-10-28.md), D-3).
 
+**Developer**
+- `MrkText.swift` (it was `TSV.swift`), the reader of mrk's `--check` lines, and `ShellEnvironment.swift` are shared verbatim with Barkeep, and `scripts/check-shared.sh` compares them in each release preflight. Dipstick keeps its own `ShellEnvironment.capture`, beside `Subprocess`, which runs it.
+
 ## [0.5] — 2026-10-28
 
 **Added**

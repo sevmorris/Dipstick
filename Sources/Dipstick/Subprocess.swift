@@ -137,3 +137,20 @@ private final class Collector: @unchecked Sendable {
         all.append(chunk)
     }
 }
+
+extension ShellEnvironment {
+    /// Asks an interactive login zsh for its environment, with Subprocess, or
+    /// returns nil when it fails, hangs past `timeout`, or prints no markers.
+    /// Subprocess gives it /dev/null for stdin.
+    static func capture(
+        shell: String = "/bin/zsh",
+        timeout: Duration = .seconds(15)
+    ) async -> [String: String]? {
+        guard let result = try? await Subprocess.run(
+            URL(fileURLWithPath: shell),
+            arguments: ["-i", "-l", "-c", script],
+            timeout: timeout
+        ), !result.timedOut else { return nil }
+        return parse(result.stdout)
+    }
+}
