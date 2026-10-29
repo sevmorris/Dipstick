@@ -35,6 +35,14 @@ struct StatusReport: Decodable, Sendable, Equatable {
         try JSONDecoder().decode(StatusReport.self, from: data)
     }
 
+    /// The schema of a document that does not decode, when it names one. A
+    /// later schema can delete or rename a key, and then the whole document
+    /// fails to decode before Dipstick can compare its schema.
+    static func schema(of data: Data) -> Int? {
+        struct Schema: Decodable { let schema: Int }
+        return try? JSONDecoder().decode(Schema.self, from: data).schema
+    }
+
     /// What is wrong, for the window to list under the verdict: each panel
     /// cut down to its lines that warn or err, each with the detail lines
     /// under it, in the report's order. A panel with no such line is left
