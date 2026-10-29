@@ -8,7 +8,7 @@ Real output of mrk's `--check` modes on the owner's Mac, captured on 2026-10-22,
   - `sync-login-items--check.out` is empty: the login items match the list.
 - `mrk-before-122/dock-setup--check.out` — `dock-setup --check` from mrk `8760cc7`, before #122: four fields, with the same `dock.txt`. Dipstick must still read it.
 - `mrk-135/snapshot-prefs--check-unread.out` — `snapshot-prefs --check` from mrk `3c3e765` (sevmorris/mrk#135 and #136), captured on 2026-10-28 under a throwaway HOME with a stub `defaults` and a stub `ls` that refuses Keka's container, as macOS refuses it to a process without permission to get the data of other apps. Keka's line is `unread`.
-- `mrk-contract.json` — the output of `scripts/mrk-contract` from mrk `9a2422a` ([sevmorris/mrk#140](https://github.com/sevmorris/mrk/pull/140)), the mrk that added it. `ContractTests` requires that it takes every option of every command Dipstick runs. Capture it again when a pane passes a new option.
+- `mrk-contract.json` — the output of `scripts/mrk-contract` from [sevmorris/mrk#140](https://github.com/sevmorris/mrk/pull/140), the mrk that added it. `ContractTests` requires that it takes every option of every command Dipstick runs. Capture it again when a pane passes a new option.
 - `check-lines.json` — a copy, byte for byte, of mrk's `tests/fixtures/check-lines.json`: the line contract of the five `--check` modes as data. Each case has its fields, and the line that `mrk_check_line` writes for them. mrk's Go tests write the lines from the encoder (`MRK_UPDATE_FIXTURES=1 go test` in `tools/mrk-status`), and fail when this copy is not mrk's file. Copy it again from mrk when it changes.
 
 Capture them again with the scripts themselves; never edit one by hand.
