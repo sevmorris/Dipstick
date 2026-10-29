@@ -70,13 +70,14 @@ trackpad keys, turns both.
 
 Dipstick reads the `--check` lines by the contract that BIN-1 states for all
 five check modes ([sevmorris/mrk#122](https://github.com/sevmorris/mrk/pull/122)):
-fields split at each tab, each with `\t`, `\n` and `\\` undone, and a line
-taken when it has at least the fields Dipstick knows, because a later mrk can
-add more at the end. A line with a word that Dipstick does not know is passed
-over. When a check prints lines and Dipstick reads none of them, the pane says
-that this Dipstick is older than mrk's output. It does not show an empty list.
-A script that exits 2 for an option Dipstick passes is an mrk older than
-Dipstick, and the pane says to run `make pull`.
+fields split at each tab, each with `\t`, `\n` and `\\` undone by Unicode
+scalar, and a line taken when it has at least the fields Dipstick knows,
+because a later mrk can add more at the end. A line with a word that Dipstick
+does not know is passed over. When a check prints lines and Dipstick reads none
+of them, the pane says that this Dipstick is older than mrk's output. It does
+not show an empty list. A script that exits 2 and names an option Dipstick
+passes as unknown is an mrk older than Dipstick, and the pane says to run
+`make pull`. Any other refusal shows mrk's own reason.
 
 **Dipstick never commits by itself.** The panes change files in the mrk
 checkout: `config/dock.txt`; the login-items list and the manual, through
@@ -193,6 +194,9 @@ Login Items. mrk's Phase 3 does both.
   ([sevmorris/mrk#131](https://github.com/sevmorris/mrk/pull/131)). Against an
   older mrk, a pane says what it cannot read and to run `make pull`, and the
   other panes still work.
+- For the files that App Preferences shows as **not read**, and a login item
+  whose name starts with a dash, mrk from 2026-10-28 on
+  ([sevmorris/mrk#135](https://github.com/sevmorris/mrk/pull/135)).
 
 ## Build, test, look
 
