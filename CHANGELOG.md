@@ -4,7 +4,7 @@ All notable changes to Dipstick are documented here. Every released version has 
 
 Write a version's entry before releasing it, and put the same prose in `release-notes/v<version>.md`: `release.sh` publishes that file as the release's notes, and stops before building anything when it is absent.
 
-## [Unreleased]
+## [0.7] — 2026-10-29
 
 **Added**
 - **The fix for a package the Brewfile lacks opens Barkeep.** With Barkeep 1.17.0 or later installed, in `/Applications` or `~/Applications`, the Unrecorded panel's fix for a package the Brewfile lacks is a **Barkeep…** button. A click opens Barkeep's Untracked list through its link, `barkeep://untracked`, where each package is added, adopted or ignored with mrk's sync, and runs nothing in a terminal. Dipstick looks for Barkeep at each refresh. It opens the installed copy by its path, because a build of Barkeep in Xcode's DerivedData declares the link too. With an earlier Barkeep, or none, the fix opens sync's picker in a terminal, as before.
