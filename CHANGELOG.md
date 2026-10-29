@@ -4,7 +4,7 @@ All notable changes to Dipstick are documented here. Every released version has 
 
 Write a version's entry before releasing it, and put the same prose in `release-notes/v<version>.md`: `release.sh` publishes that file as the release's notes, and stops before building anything when it is absent.
 
-## [Unreleased]
+## [0.6] — 2026-10-29
 
 **Added**
 - **Dipstick asks mrk which options its scripts take.** mrk from 2026-10-29 has `scripts/mrk-contract` ([sevmorris/mrk#140](https://github.com/sevmorris/mrk/pull/140)), which lists, as JSON, the options of each script that Dipstick runs. Dipstick reads it once for each checkout, and again when the file changes, before a pane runs a script. When the script does not take an option, the pane runs nothing and says that this mrk is older than Dipstick, with `make pull`; or, for a contract of a later version, that this Dipstick is older. When the script takes the option and still exits 2, the pane shows mrk's reason, and never says to run `make pull` ([sevmorris/mrk audit 22](https://github.com/sevmorris/mrk/blob/main/audit/22-audit-2026-10-28.md), O-2). With an mrk from before the command, Dipstick reads an exit 2 as 0.5 does.
@@ -16,6 +16,8 @@ Write a version's entry before releasing it, and put the same prose in `release-
 
 **Developer**
 - `MrkText.swift` (it was `TSV.swift`), the reader of mrk's `--check` lines, and `ShellEnvironment.swift` are shared verbatim with Barkeep, and `scripts/check-shared.sh` compares them in each release preflight. Dipstick keeps its own `ShellEnvironment.capture`, beside `Subprocess`, which runs it.
+- `Tests/DipstickTests/Fixtures/check-lines.json` is a copy of mrk's `tests/fixtures/check-lines.json`: for each case, the fields and the line mrk writes for them. Dipstick's tests read each line back to its fields, and mrk's tests check that the copy matches mrk's file, byte for byte ([sevmorris/mrk audit 22](https://github.com/sevmorris/mrk/blob/main/audit/22-audit-2026-10-28.md), O-1).
+- `Tests/DipstickTests/Fixtures/mrk-contract.json` is the output of mrk's `scripts/mrk-contract` with its `terminal` list, and `mrk-140/mrk-contract.json` the first output, without one. Tests read both.
 
 ## [0.5] — 2026-10-28
 
