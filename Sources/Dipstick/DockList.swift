@@ -111,11 +111,14 @@ struct DockList: Equatable, Sendable {
 
     /// Writes the list through a temporary file in the same directory,
     /// renamed over it, with mode 0644: a reader never sees half a file.
+    /// The temporary file is .dock.txt.dipstick-<UUID>, which mrk's .gitignore
+    /// keeps out of a commit should a crash leave it (config/.*).
     func write(to url: URL) throws {
         let dir = url.deletingLastPathComponent()
-        let tmp = dir.appendingPathComponent(".\(url.lastPathComponent).gearbox-\(UUID().uuidString)")
-        try Data(text.utf8).write(to: tmp)
+        let tmp = dir.appendingPathComponent(".\(url.lastPathComponent).dipstick-\(UUID().uuidString)")
         do {
+            // Inside the do, so that a write that fails part way leaves no file
+            try Data(text.utf8).write(to: tmp)
             try FileManager.default.setAttributes([.posixPermissions: 0o644], ofItemAtPath: tmp.path)
             guard rename(tmp.path, url.path) == 0 else {
                 throw CocoaError(.fileWriteUnknown, userInfo: [

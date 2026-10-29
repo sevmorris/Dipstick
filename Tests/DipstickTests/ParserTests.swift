@@ -437,7 +437,7 @@ final class DockListTests: XCTestCase {
         let mode = try FileManager.default.attributesOfItem(atPath: stub.checkout.dockList.path)[.posixPermissions] as? Int
         XCTAssertEqual(mode, 0o644)
         let leftovers = try FileManager.default.contentsOfDirectory(atPath: stub.root.appendingPathComponent("config").path)
-            .filter { $0.contains("gearbox") }
+            .filter { $0.hasPrefix(".dock.txt.") }
         XCTAssertEqual(leftovers, [])
     }
 
