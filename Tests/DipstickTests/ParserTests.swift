@@ -101,6 +101,19 @@ final class PrefsDiffTests: XCTestCase {
         XCTAssertFalse(table.names.isEmpty)
     }
 
+    /// mrk from #135 shows a file it could not read as unread. Captured with
+    /// macOS refusing Keka's container to the run.
+    func testTheRealCheckWithAFileNotRead() throws {
+        let changes = PrefChange.parse(try Fixture.text("mrk-135/snapshot-prefs--check-unread.out"))
+        XCTAssertEqual(changes, [
+            PrefChange(file: "repos.tsv", key: "", kind: .added),
+            PrefChange(file: "Keka.plist", key: "", kind: .unread),
+        ])
+        let groups = PrefGroup.group(changes, table: AppPrefsTable.parse(try Fixture.text("mrk-122/app-prefs.tsv")))
+        XCTAssertEqual(groups.map(\.name), ["repos.tsv", "Keka"])
+        XCTAssertEqual(PrefGroup.label(of: groups[1].changes[0], in: groups[1]), "The whole file")
+    }
+
     func testGroupsByTheTablesNameThenByDirectory() {
         let groups = PrefGroup.group(PrefChange.parse(output), table: table)
         XCTAssertEqual(groups.map(\.name),

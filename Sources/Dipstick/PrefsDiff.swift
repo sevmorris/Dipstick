@@ -1,9 +1,13 @@
 import Foundation
 
 /// One line of `snapshot-prefs --check`: a key of a file that the next
-/// snapshot commits to mrk-prefs.
+/// snapshot commits to mrk-prefs, or a file it could not read.
 struct PrefChange: Hashable, Sendable, Identifiable {
-    enum Kind: String, Sendable { case added, deleted, changed }
+    /// unread is a file the run could not read: an export that failed, or an
+    /// app whose container macOS does not let Dipstick read. The run keeps
+    /// its saved copy, so a change in it is not known. mrk shows it from
+    /// 2026-10-28 (sevmorris/mrk#135); until then such an app showed nothing.
+    enum Kind: String, Sendable { case added, deleted, changed, unread }
 
     /// A path in mrk-prefs, such as Raycast.plist or app-support/Loopback/x.
     let file: String

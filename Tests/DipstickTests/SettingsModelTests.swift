@@ -224,6 +224,21 @@ final class ModelTests: XCTestCase {
         XCTAssertEqual(message, "config/login-items.txt has a line that sync-login-items cannot use (see above).")
     }
 
+    /// A file snapshot-prefs could not read counts apart from the changes,
+    /// and the pane says why, with a way to Full Disk Access.
+    func testPrefsCountAFileNotRead() async throws {
+        let stub = try StubMrk()
+        try stub.write("config/app-prefs.tsv", try Fixture.text("mrk-122/app-prefs.tsv"))
+        try stub.answer("snapshot-prefs", ["--check"], out: try Fixture.text("mrk-135/snapshot-prefs--check-unread.out"))
+        let model = PrefsModel(checkout: stub.checkout, runner: stub.runner())
+        await model.load()
+        XCTAssertEqual(model.phase, .loaded)
+        XCTAssertEqual(model.changeCount, 1)
+        XCTAssertEqual(model.unreadCount, 1)
+        XCTAssertEqual(model.subtitle, "1 change(s) in 2 app(s), 1 not read")
+        XCTAssertTrue(PrefsModel.unreadMessage(1).hasPrefix("snapshot-prefs could not read 1 file,"))
+    }
+
     func testALoginItemDecisionRunsItsFlagThenChecksAgain() async throws {
         let stub = try StubMrk()
         try stub.write("config/login-items.txt", "/Applications/AlDente.app\n")

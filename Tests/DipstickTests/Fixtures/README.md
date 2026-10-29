@@ -7,5 +7,6 @@ Real output of mrk's `--check` modes on the owner's Mac, captured on 2026-10-22,
   - `defaults.sh--check--with-trackpad.out` has no `nodomain` line: Mail's and TextEdit's domains exist on this Mac.
   - `sync-login-items--check.out` is empty: the login items match the list.
 - `mrk-before-122/dock-setup--check.out` — `dock-setup --check` from mrk `8760cc7`, before #122: four fields, with the same `dock.txt`. Dipstick must still read it.
+- `mrk-135/snapshot-prefs--check-unread.out` — `snapshot-prefs --check` from mrk `3c3e765` (sevmorris/mrk#135 and #136), captured on 2026-10-28 under a throwaway HOME with a stub `defaults` and a stub `ls` that refuses Keka's container, as macOS refuses it to a process without permission to get the data of other apps. Keka's line is `unread`.
 
 Capture them again with the scripts themselves; never edit one by hand.

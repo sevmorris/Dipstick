@@ -123,7 +123,25 @@ final class PrefsModel {
         self.runner = runner
     }
 
-    var changeCount: Int { groups.reduce(0) { $0 + $1.changes.count } }
+    var changeCount: Int { groups.reduce(0) { $0 + $1.changes.filter { $0.kind != .unread }.count } }
+    var unreadCount: Int { groups.reduce(0) { $0 + $1.changes.filter { $0.kind == .unread }.count } }
+
+    /// What the pane's title bar says under its title.
+    var subtitle: String {
+        var text = "\(changeCount) change(s) in \(groups.count) app(s)"
+        if unreadCount > 0 { text += ", \(unreadCount) not read" }
+        return text
+    }
+
+    /// What the pane says over the list, for COUNT files the run could not
+    /// read. Full Disk Access holds the narrower permission to get the data
+    /// of other apps, and is the one that System Settings lists.
+    static func unreadMessage(_ count: Int) -> String {
+        let files = count == 1 ? "1 file" : "\(count) files"
+        return "snapshot-prefs could not read \(files), so a change in them is not known, and the snapshot keeps the saved copy. "
+            + "Its export failed, or macOS did not let Dipstick read the app's container: "
+            + "turn Dipstick on under Full Disk Access, and let macOS quit and reopen it."
+    }
 
     func load() async {
         phase = .loading
