@@ -21,6 +21,14 @@ final class StatusModel {
     /// mrk Settings' model: made the first time the window opens, and kept,
     /// so each pane keeps what it read.
     private(set) var settings: SettingsModel?
+    /// The Make targets whose fixes run in a terminal, as the checkout's
+    /// mrk-contract names them, read at each refresh (TerminalLauncher).
+    private(set) var terminalTargets = TerminalLauncher.fullScreenTargets
+    /// Runs mrk's scripts for mrk Settings, and keeps each checkout's
+    /// contract, which the refresh reads too.
+    @ObservationIgnored private(set) lazy var runner = MrkRunner(environment: { [weak self] in
+        await self?.resolvedEnvironment() ?? [:]
+    })
 
     let home: String
     private var environment: [String: String]?
@@ -125,8 +133,11 @@ final class StatusModel {
             changedDuringRefresh = false
             if environment == nil || reload {
                 environment = await environmentProvider()
-                await settings?.runner.forgetEnvironment()
+                await runner.forgetEnvironment()
             }
+            // Before the report, so its fix buttons show where they run. A
+            // make pull that changes mrk-contract changes the targets.
+            terminalTargets = TerminalLauncher.targets(in: await runner.contract(for: checkout))
 
             switch await StatusRunner.fetch(environment: environment ?? [:], home: home) {
             case .success(let fresh):
@@ -158,17 +169,24 @@ final class StatusModel {
         return env
     }
 
+    /// Whether `command` draws a full screen, and so runs in a terminal and
+    /// not in the console: TerminalLauncher.isNeeded, with the checkout's
+    /// targets.
+    func needsTerminal(_ command: String) -> Bool {
+        TerminalLauncher.isNeeded(for: command, targets: terminalTargets)
+    }
+
     /// Runs `command` in the checkout, as the TUI's `f` does: in Dipstick's
     /// console, or in a terminal for the few fixes that draw a full screen
-    /// (TerminalLauncher.isNeeded). A fix asks first, as `f` does. A fix that
-    /// a pane of mrk Settings makes instead (FixRoute) opens that pane: it
-    /// shows what the fix would change, and runs nothing until asked.
+    /// (`needsTerminal`). A fix asks first, as `f` does. A fix that a pane of
+    /// mrk Settings makes instead (FixRoute) opens that pane: it shows what
+    /// the fix would change, and runs nothing until asked.
     func run(_ command: String, confirm: Bool = true) {
         if let route = FixRoute.route(for: command) {
             openSettings(route.pane, withTrackpad: route.withTrackpad)
             return
         }
-        let inTerminal = TerminalLauncher.isNeeded(for: command)
+        let inTerminal = needsTerminal(command)
         NSApp.activate()
         if confirm {
             let alert = NSAlert()
@@ -273,10 +291,7 @@ final class StatusModel {
         _ = await resolvedEnvironment()
         // Asked again: another call can have made it while the shell answered.
         if let settings { return settings }
-        let made = SettingsModel(
-            checkout: checkout,
-            runner: MrkRunner(environment: { [weak self] in await self?.resolvedEnvironment() ?? [:] }),
-            store: settingsStore, home: home)
+        let made = SettingsModel(checkout: checkout, runner: runner, store: settingsStore, home: home)
         made.host = self
         settings = made
         return made

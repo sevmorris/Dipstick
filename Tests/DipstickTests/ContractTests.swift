@@ -15,10 +15,12 @@ final class ContractTests: XCTestCase {
         .loginItemsAdd("-A"), .loginItemsIgnore("-A"), .loginItemsRemove("-A"), .dockCheck,
     ]
 
-    /// A contract with each script Dipstick runs, and the options given.
+    /// A contract with each script Dipstick runs, and the options given, and
+    /// the terminal targets when given.
     static func contract(version: Int = 1, defaults: [String] = ["--check", "--with-trackpad", "--skip", "--unskip", "--key", "--revert"],
                          loginItems: [String] = ["--check", "--add", "--ignore", "--remove"],
-                         equals: [String] = ["--add", "--ignore", "--remove"]) -> String {
+                         equals: [String] = ["--add", "--ignore", "--remove"],
+                         terminal: [String]? = nil) -> String {
         func list(_ words: [String]) -> String { "[" + words.map { "\"\($0)\"" }.joined(separator: ", ") + "]" }
         return """
         {"contract": \(version), "about": "", "later": {"a key": "a later mrk adds"}, "scripts": {
@@ -26,7 +28,7 @@ final class ContractTests: XCTestCase {
           "scripts/sync-login-items": {"options": \(list(loginItems)), "equals": \(list(equals)), "decisions": [], "check": null},
           "scripts/snapshot-prefs": {"options": ["--check"], "equals": [], "decisions": [], "check": null},
           "scripts/dock-setup": {"options": ["--check"], "equals": [], "decisions": [], "check": null}
-        }}
+        }\(terminal.map { #", "terminal": "# + list($0) } ?? "")}
         """
     }
 

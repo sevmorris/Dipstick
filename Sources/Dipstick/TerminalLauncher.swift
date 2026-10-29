@@ -17,7 +17,10 @@ enum TerminalLauncher {
     /// `choose` is the list mrk's scripts pick from.
     static let fullScreenPrograms: Set<String> = ["mrk-menu", "mrk-picker", "gum"]
 
-    /// The Make targets whose scripts start one of those programs.
+    /// The Make targets whose scripts start one of those programs, for an mrk
+    /// whose scripts/mrk-contract does not list them (`targets(in:)`): one
+    /// from before mrk-contract, or from before its `terminal` list. A later
+    /// mrk names them itself, and its tests hold the list to the Makefile.
     static let fullScreenTargets: Set<String> = [
         // scripts/sync: mrk-picker for the packages the Brewfile lacks, and
         // gum choose for the entries nothing installs. `make sync ARGS=-c`.
@@ -29,13 +32,21 @@ enum TerminalLauncher {
         "brew",
     ]
 
+    /// The Make targets that need a terminal in a checkout whose contract is
+    /// `contract`: its `terminal` list, or `fullScreenTargets` when there is
+    /// no contract or it has no list (sevmorris/mrk audit 22, opportunity 5).
+    static func targets(in contract: MrkContract?) -> Set<String> {
+        contract?.terminal.map(Set.init) ?? fullScreenTargets
+    }
+
     /// Whether `command`, a fix as mrk-status writes it, needs a terminal
-    /// window of its own. Every other fix runs in Dipstick's console.
-    static func isNeeded(for command: String) -> Bool {
+    /// window of its own, where `targets` are the Make targets that do. Every
+    /// other fix runs in Dipstick's console.
+    static func isNeeded(for command: String, targets: Set<String> = fullScreenTargets) -> Bool {
         let words = command.split(whereSeparator: \.isWhitespace).map(String.init)
         guard let program = words.first else { return false }
         if fullScreenPrograms.contains((program as NSString).lastPathComponent) { return true }
-        return makeTarget(of: command).map(fullScreenTargets.contains) ?? false
+        return makeTarget(of: command).map(targets.contains) ?? false
     }
 
     /// The Make target `command` runs, or nil when it is not `make`. make's

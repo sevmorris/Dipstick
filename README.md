@@ -148,7 +148,10 @@ check modes and shows the result, so the app and the terminal always agree.
 - **Fixes in a terminal.** For the full-screen fixes, Dipstick writes the
   command into a `.command` file and opens it. That starts the command in the
   app that opens `.command` files (Terminal, unless another terminal has
-  claimed them). The file deletes itself when it runs.
+  claimed them). The file deletes itself when it runs. A full-screen fix is
+  one that starts `mrk-menu`, `mrk-picker` or `gum`, or one whose Make target
+  the checkout's `scripts/mrk-contract` lists under `terminal`. For an mrk
+  with no such list, the targets are `sync`, `sync-login-items` and `brew`.
 - **Updates.** Check for Updates… asks GitHub for a newer Dipstick. Dipstick
   also asks at launch and once a day without telling you, and when a newer
   version is out, the menu bar window's footer and mrk Settings' sidebar name
