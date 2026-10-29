@@ -46,6 +46,40 @@ final class TSVTests: XCTestCase {
         XCTAssertTrue(MrkText.isEntry(" /Applications/x.app"))
         XCTAssertTrue(MrkText.isEntry("/Applications/#1.app"))
     }
+
+    /// Fixtures/check-lines.json is a copy of mrk's tests/fixtures/check-lines.json:
+    /// for each case, the fields and the line mrk_check_line writes for them.
+    /// mrk's own tests compare the copy with mrk's file, byte for byte, when
+    /// Dipstick is checked out beside it. Swift's == on String takes a
+    /// composed and a decomposed accent as equal, so these compare scalars.
+    private struct CheckLines: Decodable {
+        struct Case: Decodable {
+            let why: String
+            let fields: [String]
+            let line: String
+        }
+        let cases: [Case]
+    }
+
+    private func checkLines() throws -> CheckLines {
+        let fixture = try JSONDecoder().decode(CheckLines.self, from: Data(Fixture.text("check-lines.json").utf8))
+        XCTAssertFalse(fixture.cases.isEmpty)
+        return fixture
+    }
+
+    private func scalars(_ s: some StringProtocol) -> [Unicode.Scalar] { Array(s.unicodeScalars) }
+
+    func testEachLineOfMrksFixtureGivesBackItsFields() throws {
+        for c in try checkLines().cases {
+            XCTAssertEqual(MrkText.fields(Substring(c.line))?.map(scalars), c.fields.map(scalars), c.why)
+        }
+    }
+
+    func testMrksFixtureLinesAsOneOutputSplitBackTheSame() throws {
+        let cases = try checkLines().cases
+        let output = cases.map { $0.line + "\n" }.joined()
+        XCTAssertEqual(MrkText.lines(output).map(scalars), cases.map { scalars($0.line) })
+    }
 }
 
 final class PrefsDiffTests: XCTestCase {

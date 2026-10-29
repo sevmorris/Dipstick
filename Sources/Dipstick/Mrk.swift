@@ -128,16 +128,12 @@ enum TerminalCommand: Equatable, Sendable {
     case snapshotPrefs
     case applyDefaults(withTrackpad: Bool)
     case applyDock
-    /// make dock's dry run, which reads config/dock.txt and changes nothing:
-    /// what `--snapshot` shows in the console.
-    case dockDryRun
 
     var command: String {
         switch self {
         case .snapshotPrefs: return "make snapshot-prefs"
         case .applyDefaults(let trackpad): return trackpad ? "make trackpad" : "make defaults"
         case .applyDock: return "make dock"
-        case .dockDryRun: return "make dock ARGS=-n"
         }
     }
 
@@ -146,7 +142,7 @@ enum TerminalCommand: Equatable, Sendable {
         switch self {
         case .snapshotPrefs: return .preferences
         case .applyDefaults: return .defaults
-        case .applyDock, .dockDryRun: return .dock
+        case .applyDock: return .dock
         }
     }
 }
