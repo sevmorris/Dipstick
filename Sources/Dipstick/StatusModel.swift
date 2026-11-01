@@ -428,6 +428,7 @@ final class StatusModel {
             break
         }
         guard !quietly else { return }
+        if SelfUpdateFlow.bringForward() { return }
 
         NSApp.activate()
         let alert = NSAlert()
@@ -439,16 +440,11 @@ final class StatusModel {
             alert.runModal()
 
         case .available(let update):
-            alert.messageText = "Update Available"
-            alert.informativeText = "Dipstick \(update.version) is available. You have \(UpdateChecker.installedVersion)."
-            alert.addButton(withTitle: "Download")
-            alert.addButton(withTitle: "Release Notes")
-            alert.addButton(withTitle: "Not Now")
-            switch alert.runModal() {
-            case .alertFirstButtonReturn: NSWorkspace.shared.open(update.downloadURL)
-            case .alertSecondButtonReturn: NSWorkspace.shared.open(update.releaseURL)
-            default: break
-            }
+            await SelfUpdateFlow.offer(SelfUpdatePrompt(appName: "Dipstick", version: update.version,
+                                                        downloadURL: update.downloadURL, releaseURL: update.releaseURL,
+                                                        isBusy: { [self] in isConsoleRunning },
+                                                        busyMessage: "Dipstick can update when the console's command has finished."),
+                                       silent: false)
 
         case .needsNewerMacOS(let version, let minimum, let installed):
             alert.messageText = "Dipstick \(version) needs macOS \(minimum)"

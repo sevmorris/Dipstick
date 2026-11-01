@@ -73,7 +73,7 @@ struct StatusView: View {
                 } label: {
                     Label("Dipstick \(update.version)", systemImage: "arrow.down.circle.fill")
                 }
-                .help("A newer Dipstick is out: download it or read its release notes")
+                .help("A newer Dipstick is out: install it or read its release notes")
             } else {
                 Button("Check for Updates…") { Task { await model.checkForUpdates() } }
                     .help("Ask GitHub for a Dipstick newer than \(UpdateChecker.installedVersion)")
