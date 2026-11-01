@@ -4,6 +4,18 @@ All notable changes to Dipstick are documented here. Every released version has 
 
 Write a version's entry before releasing it, and put the same prose in `release-notes/v<version>.md`: `release.sh` publishes that file as the release's notes, and stops before building anything when it is absent.
 
+## [0.8] — 2026-11-01
+
+**Added**
+- **Dipstick updates itself.** The update prompt now offers **Update and Relaunch**. Dipstick downloads the new version, checks that it's a signed release, replaces itself and reopens, with no disk image to open or app to drag. This starts with the update after this one: to get this version, download it as usual.
+- **An update never interrupts a console command.** It waits for the command to finish, then asks before relaunching.
+
+**Changed**
+- **If Dipstick can't update itself, it says why.** A copy running from the disk image, or one you don't have permission to change, still offers **Download**, with the reason. So does any update that fails, and the installed app is left as it was.
+
+**Developer**
+- `SelfUpdater.swift` is shared verbatim with the sibling apps and needs no update feed or new key: it relies on the Developer ID signature that release DMGs and apps already carry.
+
 ## [0.7] — 2026-10-29
 
 **Added**
