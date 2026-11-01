@@ -24,7 +24,7 @@ struct SettingsView: View {
                         }
                         .buttonStyle(.link)
                         .padding(.bottom, 4)
-                        .help("A newer Dipstick is out: download it or read its release notes")
+                        .help("A newer Dipstick is out: install it or read its release notes")
                     }
                     Text(model.checkout.root.path)
                         .font(.caption.monospaced())

@@ -163,7 +163,10 @@ check modes and shows the result, so the app and the terminal always agree.
 - **Updates.** Check for Updates… asks GitHub for a newer Dipstick. Dipstick
   also asks at launch and once a day without telling you, and when a newer
   version is out, the menu bar window's footer and mrk Settings' sidebar name
-  it. A version that needs a newer macOS than this Mac has is not offered.
+  it. **Update and Relaunch** installs it and reopens Dipstick, after any command
+  running in the console has finished. A copy that can't replace itself offers
+  the DMG instead. A version that needs a newer macOS than this Mac has is not
+  offered.
 
 ### Privacy
 
