@@ -52,6 +52,7 @@ struct SettingsView: View {
                         case .defaults: DefaultsPane(model: model)
                         case .loginItems: LoginItemsPane(model: model)
                         case .dock: DockPane(model: model)
+                        case .commands: CommandsPane(model: model)
                         }
                     }
                 }

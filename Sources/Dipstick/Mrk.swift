@@ -74,6 +74,9 @@ enum MrkCommand: Equatable, Sendable {
     /// Each item of config/dock.txt: app or folder, line, path, state, and
     /// whether it is docked; then each unlisted item the Dock has.
     case dockCheck
+    /// mrk-menu's commands, as JSON: the Commands pane's list. mrk-menu is a
+    /// Go binary that make build-tools writes into bin/.
+    case menuList
 
     var script: String {
         switch self {
@@ -82,6 +85,7 @@ enum MrkCommand: Equatable, Sendable {
         case .loginItemsCheck, .loginItemsAdd, .loginItemsIgnore, .loginItemsRemove:
             return "scripts/sync-login-items"
         case .dockCheck: return "scripts/dock-setup"
+        case .menuList: return "bin/mrk-menu"
         }
     }
 
@@ -97,6 +101,7 @@ enum MrkCommand: Equatable, Sendable {
         case .loginItemsIgnore(let name): return Self.decision("--ignore", name)
         case .loginItemsRemove(let name): return Self.decision("--remove", name)
         case .dockCheck: return ["--check"]
+        case .menuList: return ["--json"]
         }
     }
 
@@ -119,6 +124,7 @@ enum MrkCommand: Equatable, Sendable {
         }
         switch self {
         case .prefsCheck, .loginItemsCheck, .dockCheck: return plain("--check")
+        case .menuList: return plain("--json")
         case .defaultsCheck(let trackpad): return trackpad ? plain("--check", "--with-trackpad") : plain("--check")
         case .defaultsOff: return plain("--skip", "--revert")
         case .defaultsOn: return plain("--unskip", "--key")

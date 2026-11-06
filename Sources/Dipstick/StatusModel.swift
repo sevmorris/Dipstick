@@ -49,6 +49,13 @@ final class StatusModel {
     /// unless a test gives its own.
     private let findBarkeep: @MainActor () -> URL?
     private let openInBarkeep: @MainActor (URL) -> Void
+    /// Asks before a command of the Commands pane runs, and returns what was
+    /// typed ("" with nothing to type), or nil for Cancel: an alert, unless a
+    /// test gives its own answer.
+    private let confirmCommand: CommandConfirmer
+    /// Starts a command in a terminal window: TerminalLauncher, unless a test
+    /// gives its own, so that no test opens Terminal.
+    private let launchTerminal: TerminalStarter
     /// Set when a fix ends while mrk-status runs. That run read mrk as it
     /// was, so it goes round again.
     @ObservationIgnored private var changedDuringRefresh = false
@@ -71,14 +78,21 @@ final class StatusModel {
     init(home: String = NSHomeDirectory(), opensWindows: Bool = true,
          environment: EnvironmentProvider? = nil, settingsStore: UserDefaults = .app,
          findBarkeep: (@MainActor () -> URL?)? = nil,
-         openInBarkeep: @escaping @MainActor (URL) -> Void = { BarkeepLink.open(in: $0) }) {
+         openInBarkeep: @escaping @MainActor (URL) -> Void = { BarkeepLink.open(in: $0) },
+         confirmCommand: @escaping CommandConfirmer = StatusModel.askToRun,
+         launchTerminal: @escaping TerminalStarter = { try TerminalLauncher.run(command: $0, directory: $1, exports: $2) }) {
         self.home = home
         self.opensWindows = opensWindows
         self.settingsStore = settingsStore
         self.environmentProvider = environment ?? { await Self.loginShellEnvironment(home: home) }
         self.findBarkeep = findBarkeep ?? { BarkeepLink.installedApp(home: home) }
         self.openInBarkeep = openInBarkeep
+        self.confirmCommand = confirmCommand
+        self.launchTerminal = launchTerminal
     }
+
+    typealias CommandConfirmer = @MainActor (_ command: CommandCatalog.Command, _ directory: String) -> String?
+    typealias TerminalStarter = @MainActor (_ command: String, _ directory: String, _ exports: [String: String]) throws -> Void
 
     /// What a terminal window on this Mac has, or Dipstick's own environment
     /// with the usual PATH when the shell cannot be asked.
@@ -227,6 +241,52 @@ final class StatusModel {
         } else {
             Task { await runInConsole(command) }
         }
+    }
+
+    /// Runs one of mrk-menu's commands, from the Commands pane, exactly as it
+    /// is written, as mrk-menu does: in a terminal when the list marks it
+    /// `terminal`, and in the console otherwise. Unlike `run`, it never opens
+    /// a pane or Barkeep in its place, so a row does what its label says. It
+    /// asks first, and a command with a word to type runs only when that
+    /// word was typed. The task, when it runs in the console, ends when the
+    /// command has exited.
+    @discardableResult
+    func runCommand(_ command: CommandCatalog.Command) -> Task<Void, Never>? {
+        guard let typed = confirmCommand(command, tilde(repoRoot)) else { return nil }
+        guard command.typeToConfirm.isEmpty || typed == command.typeToConfirm else {
+            NSSound.beep()
+            return nil
+        }
+        if command.terminal {
+            runInTerminal(command.command)
+            return nil
+        }
+        return Task { await runInConsole(command.command) }
+    }
+
+    /// The alert before a command of the Commands pane runs: the command,
+    /// where it runs, and a field for the word when it has one, as mrk-menu
+    /// asks for nuke-mrk. What was typed, or nil for Cancel.
+    static func askToRun(_ command: CommandCatalog.Command, directory: String) -> String? {
+        NSApp.activate()
+        let alert = NSAlert()
+        alert.messageText = command.terminal ? "Run this in a terminal?" : "Run this in Dipstick's console?"
+        var info = "\(command.command)\n\nin \(directory)\n\n\(command.description)"
+        var field: NSTextField?
+        if !command.typeToConfirm.isEmpty {
+            alert.alertStyle = .critical
+            info += "\n\nType \(command.typeToConfirm) to run it. Anything else cancels."
+            let input = NSTextField(frame: NSRect(x: 0, y: 0, width: 240, height: 24))
+            input.placeholderString = command.typeToConfirm
+            alert.accessoryView = input
+            field = input
+        }
+        alert.informativeText = info
+        alert.addButton(withTitle: "Run")
+        alert.addButton(withTitle: "Cancel")
+        if let field { alert.window.initialFirstResponder = field }
+        guard alert.runModal() == .alertFirstButtonReturn else { return nil }
+        return field?.stringValue ?? ""
     }
 
     /// Whether a command is running in the console. Dipstick does not quit
@@ -404,7 +464,7 @@ final class StatusModel {
             if let value = environment?[name], !value.isEmpty { exports[name] = value }
         }
         do {
-            try TerminalLauncher.run(command: command, directory: repoRoot, exports: exports)
+            try launchTerminal(command, repoRoot, exports)
         } catch {
             let alert = NSAlert(error: error)
             alert.runModal()

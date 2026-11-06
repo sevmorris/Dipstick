@@ -1,0 +1,323 @@
+{
+  "schema": 1,
+  "categories": [
+    {
+      "name": "Daily",
+      "commands": [
+        {
+          "name": "sync --push",
+          "description": "add new Homebrew packages to the Brewfile, commit and push",
+          "command": "scripts/sync --push",
+          "terminal": true,
+          "type_to_confirm": ""
+        },
+        {
+          "name": "sync-login-items -c",
+          "description": "track new login items in config/login-items.txt, and commit",
+          "command": "scripts/sync-login-items -c",
+          "terminal": true,
+          "type_to_confirm": ""
+        },
+        {
+          "name": "mrk-push",
+          "description": "commit and push ~/mrk (asks for the message)",
+          "command": "bin/mrk-push",
+          "terminal": false,
+          "type_to_confirm": ""
+        }
+      ]
+    },
+    {
+      "name": "Brewfile",
+      "commands": [
+        {
+          "name": "sync",
+          "description": "diff installed packages, add missing to Brewfile",
+          "command": "scripts/sync",
+          "terminal": true,
+          "type_to_confirm": ""
+        },
+        {
+          "name": "sync --prune",
+          "description": "remove Brewfile entries for uninstalled packages",
+          "command": "scripts/sync --prune",
+          "terminal": true,
+          "type_to_confirm": ""
+        },
+        {
+          "name": "sync --dry-run",
+          "description": "show what sync would do, no changes",
+          "command": "scripts/sync --dry-run",
+          "terminal": true,
+          "type_to_confirm": ""
+        }
+      ]
+    },
+    {
+      "name": "Login items",
+      "commands": [
+        {
+          "name": "sync-login-items",
+          "description": "diff and sync system login items",
+          "command": "scripts/sync-login-items",
+          "terminal": true,
+          "type_to_confirm": ""
+        }
+      ]
+    },
+    {
+      "name": "Preferences",
+      "commands": [
+        {
+          "name": "snapshot-prefs",
+          "description": "export and push app prefs to mrk-prefs",
+          "command": "scripts/snapshot-prefs",
+          "terminal": false,
+          "type_to_confirm": ""
+        },
+        {
+          "name": "snapshot-prefs --dry-run",
+          "description": "show what snapshot-prefs would commit, push nothing",
+          "command": "scripts/snapshot-prefs --dry-run",
+          "terminal": false,
+          "type_to_confirm": ""
+        }
+      ]
+    },
+    {
+      "name": "Diagnostics",
+      "commands": [
+        {
+          "name": "mrk-status",
+          "description": "daily dashboard",
+          "command": "bin/mrk-status",
+          "terminal": false,
+          "type_to_confirm": ""
+        },
+        {
+          "name": "make doctor",
+          "description": "check ~/bin is on PATH",
+          "command": "make doctor",
+          "terminal": false,
+          "type_to_confirm": ""
+        },
+        {
+          "name": "make doctor ARGS=--fix",
+          "description": "also fix PATH if missing",
+          "command": "make doctor ARGS=--fix",
+          "terminal": false,
+          "type_to_confirm": ""
+        }
+      ]
+    },
+    {
+      "name": "Maintenance",
+      "commands": [
+        {
+          "name": "make pull",
+          "description": "pull mrk, rebuild and relink what changed",
+          "command": "make pull",
+          "terminal": false,
+          "type_to_confirm": ""
+        },
+        {
+          "name": "make update",
+          "description": "upgrade packages (topgrade or brew upgrade)",
+          "command": "make update",
+          "terminal": false,
+          "type_to_confirm": ""
+        },
+        {
+          "name": "make updates",
+          "description": "install macOS updates, never a major upgrade",
+          "command": "make updates",
+          "terminal": false,
+          "type_to_confirm": ""
+        },
+        {
+          "name": "make updates ARGS=-n",
+          "description": "list macOS updates, install nothing",
+          "command": "make updates ARGS=-n",
+          "terminal": false,
+          "type_to_confirm": ""
+        },
+        {
+          "name": "make maintain",
+          "description": "prune deployments, fetch --prune, validate, check builds",
+          "command": "make maintain",
+          "terminal": false,
+          "type_to_confirm": ""
+        },
+        {
+          "name": "make tidy",
+          "description": "go mod tidy in all tool directories",
+          "command": "make tidy",
+          "terminal": false,
+          "type_to_confirm": ""
+        },
+        {
+          "name": "make fix-exec",
+          "description": "make all scripts and bin files executable",
+          "command": "make fix-exec",
+          "terminal": false,
+          "type_to_confirm": ""
+        },
+        {
+          "name": "update-full",
+          "description": "full pass: quits apps, updates, rebuilds, offers reboot",
+          "command": "bin/update-full",
+          "terminal": true,
+          "type_to_confirm": ""
+        },
+        {
+          "name": "pushall",
+          "description": "commit and push every repo in ~/Projects, and then mrk",
+          "command": "bin/pushall",
+          "terminal": false,
+          "type_to_confirm": ""
+        },
+        {
+          "name": "pushall --dry-run",
+          "description": "scan and report; commit and push nothing",
+          "command": "bin/pushall --dry-run",
+          "terminal": false,
+          "type_to_confirm": ""
+        },
+        {
+          "name": "clean-ds",
+          "description": "remove .DS_Store files from local volumes",
+          "command": "bin/clean-ds",
+          "terminal": false,
+          "type_to_confirm": ""
+        },
+        {
+          "name": "clean-ds --dry-run",
+          "description": "list .DS_Store files, delete nothing",
+          "command": "bin/clean-ds --dry-run",
+          "terminal": false,
+          "type_to_confirm": ""
+        },
+        {
+          "name": "tidy-projects",
+          "description": "survey the clones in ~/Projects and ~/mrk, change nothing",
+          "command": "bin/tidy-projects",
+          "terminal": false,
+          "type_to_confirm": ""
+        },
+        {
+          "name": "tidy-projects --apply ff,refs,worktrees,branches",
+          "description": "fast-forward, prune refs, drop finished worktrees and merged branches",
+          "command": "bin/tidy-projects --apply ff,refs,worktrees,branches",
+          "terminal": false,
+          "type_to_confirm": ""
+        },
+        {
+          "name": "prune-deployments --dry-run",
+          "description": "list old Pages deployments, delete nothing",
+          "command": "bin/prune-deployments --dry-run",
+          "terminal": false,
+          "type_to_confirm": ""
+        },
+        {
+          "name": "prune-deployments",
+          "description": "delete old Pages deployments, keep the live one",
+          "command": "bin/prune-deployments",
+          "terminal": false,
+          "type_to_confirm": ""
+        }
+      ]
+    },
+    {
+      "name": "Setup",
+      "commands": [
+        {
+          "name": "make defaults",
+          "description": "apply macOS defaults",
+          "command": "make defaults",
+          "terminal": false,
+          "type_to_confirm": ""
+        },
+        {
+          "name": "make harden",
+          "description": "apply security hardening (Touch ID sudo, firewall)",
+          "command": "make harden",
+          "terminal": false,
+          "type_to_confirm": ""
+        },
+        {
+          "name": "make trackpad",
+          "description": "apply defaults including trackpad",
+          "command": "make trackpad",
+          "terminal": false,
+          "type_to_confirm": ""
+        },
+        {
+          "name": "make dotfiles",
+          "description": "relink dotfiles",
+          "command": "make dotfiles",
+          "terminal": false,
+          "type_to_confirm": ""
+        },
+        {
+          "name": "make tools",
+          "description": "relink scripts and bin into ~/bin",
+          "command": "make tools",
+          "terminal": false,
+          "type_to_confirm": ""
+        }
+      ]
+    },
+    {
+      "name": "Migration",
+      "commands": [
+        {
+          "name": "snapshot-keys",
+          "description": "bundle ~/.ssh, ~/.gnupg and signing identities",
+          "command": "scripts/snapshot-keys",
+          "terminal": false,
+          "type_to_confirm": ""
+        },
+        {
+          "name": "snapshot-keys --dry-run",
+          "description": "show what would be bundled, write nothing",
+          "command": "scripts/snapshot-keys --dry-run",
+          "terminal": false,
+          "type_to_confirm": ""
+        },
+        {
+          "name": "pull-prefs",
+          "description": "clone or update app prefs from mrk-prefs",
+          "command": "scripts/pull-prefs",
+          "terminal": false,
+          "type_to_confirm": ""
+        },
+        {
+          "name": "restore-repos",
+          "description": "clone the repos listed in the mrk-prefs manifest",
+          "command": "scripts/restore-repos",
+          "terminal": false,
+          "type_to_confirm": ""
+        },
+        {
+          "name": "restore-repos --dry-run",
+          "description": "show which repos would be cloned",
+          "command": "scripts/restore-repos --dry-run",
+          "terminal": false,
+          "type_to_confirm": ""
+        }
+      ]
+    },
+    {
+      "name": "Nuclear options",
+      "commands": [
+        {
+          "name": "nuke-mrk",
+          "description": "remove all mrk symlinks and undo setup",
+          "command": "bin/nuke-mrk",
+          "terminal": true,
+          "type_to_confirm": "nuke"
+        }
+      ]
+    }
+  ]
+}
