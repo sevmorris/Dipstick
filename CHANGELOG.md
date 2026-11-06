@@ -4,7 +4,7 @@ All notable changes to Dipstick are documented here. Every released version has 
 
 Write a version's entry before releasing it, and put the same prose in `release-notes/v<version>.md`: `release.sh` publishes that file as the release's notes, and stops before building anything when it is absent.
 
-## [Unreleased]
+## [0.9] — 2026-11-05
 
 **Added**
 - **A Commands pane in mrk Settings.** It lists every mrk-menu command, in the same groups and order, and runs the one you choose. That means you can run `make pull`, `make update`, `clean-ds` or `tidy-projects` whenever you want, not only when the menu bar shows a fix for it.
@@ -14,6 +14,9 @@ Write a version's entry before releasing it, and put the same prose in `release-
 **Developer**
 - `--snapshot` draws the new pane as `6-commands.png`, and the console is now `7-console.png`.
 - `StatusModel` takes the Commands pane's confirmation and its Terminal launcher as parameters, so tests never show a dialog or open Terminal.
+
+**Updating**
+- From 0.8, **Update and Relaunch** installs this version in place. The Commands pane needs an mrk from 2026-11-05 or later (`make pull`), whose mrk-menu has `--json`.
 
 ## [0.8] — 2026-11-01
 
