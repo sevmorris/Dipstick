@@ -4,6 +4,17 @@ All notable changes to Dipstick are documented here. Every released version has 
 
 Write a version's entry before releasing it, and put the same prose in `release-notes/v<version>.md`: `release.sh` publishes that file as the release's notes, and stops before building anything when it is absent.
 
+## [Unreleased]
+
+**Added**
+- **A Commands pane in mrk Settings.** It lists every mrk-menu command, in the same groups and order, and runs the one you choose. That means you can run `make pull`, `make update`, `clean-ds` or `tidy-projects` whenever you want, not only when the menu bar shows a fix for it.
+- **A row runs exactly what it shows.** Commands that can show a picker (those of `sync` and `sync-login-items`), `update-full` and `nuke-mrk` open in Terminal. Every other command runs in Dipstick's console. Unlike a fix, a command here never opens another pane or Barkeep instead. nuke-mrk runs only after you type `nuke`, as in mrk-menu.
+- **The list comes from mrk.** It's read from `mrk-menu --json` in your checkout, so commands mrk adds to the menu appear here without a Dipstick update. If mrk-menu isn't built, the pane tells you to run `make build-tools`. If it's from before `--json`, the pane tells you to run `make pull`.
+
+**Developer**
+- `--snapshot` draws the new pane as `6-commands.png`, and the console is now `7-console.png`.
+- `StatusModel` takes the Commands pane's confirmation and its Terminal launcher as parameters, so tests never show a dialog or open Terminal.
+
 ## [0.8] — 2026-11-01
 
 **Added**

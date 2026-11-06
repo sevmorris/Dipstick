@@ -18,7 +18,7 @@ enum LoadPhase: Equatable, Sendable {
 }
 
 enum Pane: String, CaseIterable, Identifiable, Sendable {
-    case preferences, defaults, loginItems, dock
+    case preferences, defaults, loginItems, dock, commands
     var id: String { rawValue }
 
     var title: String {
@@ -27,6 +27,7 @@ enum Pane: String, CaseIterable, Identifiable, Sendable {
         case .defaults: return "macOS Defaults"
         case .loginItems: return "Login Items"
         case .dock: return "Dock"
+        case .commands: return "Commands"
         }
     }
 
@@ -36,6 +37,7 @@ enum Pane: String, CaseIterable, Identifiable, Sendable {
         case .defaults: return "gearshape.2"
         case .loginItems: return "power"
         case .dock: return "dock.rectangle"
+        case .commands: return "terminal"
         }
     }
 }
@@ -52,6 +54,7 @@ final class SettingsModel {
     let defaults: DefaultsModel
     let loginItems: LoginItemsModel
     let dock: DockModel
+    let commands: CommandsModel
 
     var selection: Pane? {
         didSet { store.set(selection?.rawValue, forKey: "selectedPane") }
@@ -70,6 +73,7 @@ final class SettingsModel {
         defaults = DefaultsModel(checkout: checkout, runner: runner, store: store)
         loginItems = LoginItemsModel(checkout: checkout, runner: runner)
         dock = DockModel(checkout: checkout, runner: runner, home: home)
+        commands = CommandsModel(checkout: checkout, runner: runner)
         selection = store.string(forKey: "selectedPane").flatMap(Pane.init(rawValue:)) ?? .preferences
         // A decision changes what mrk-status reports: the Unrecorded panel's
         // uncommitted files, and the drift the panels count.
@@ -91,6 +95,7 @@ final class SettingsModel {
         case .defaults: await defaults.load()
         case .loginItems: await loginItems.load()
         case .dock: await dock.load()
+        case .commands: await commands.load()
         }
     }
 
@@ -109,6 +114,70 @@ final class SettingsModel {
     func runInConsole(_ command: TerminalCommand) async {
         guard !isDeciding else { return }
         await host?.runInConsole(command.command, pane: command.pane)
+    }
+
+    /// Runs one of mrk-menu's commands from the Commands pane, as written
+    /// (StatusModel.runCommand). Not while a switch or a login item decision
+    /// runs, for the same reason as runInConsole.
+    @discardableResult
+    func run(_ command: CommandCatalog.Command) -> Task<Void, Never>? {
+        guard !isDeciding else { return nil }
+        return host?.runCommand(command)
+    }
+}
+
+// MARK: - Commands
+
+/// mrk-menu's commands, from `mrk-menu --json`, for the Commands pane. The
+/// pane runs each one exactly as it is written, as mrk-menu does, and never
+/// opens a pane or Barkeep in its place as a fix does: a row does what its
+/// label says.
+@Observable @MainActor
+final class CommandsModel {
+    let checkout: MrkCheckout
+    let runner: MrkRunner
+    var phase: LoadPhase = .idle
+    var categories: [CommandCatalog.Category] = []
+    var search = ""
+
+    init(checkout: MrkCheckout, runner: MrkRunner) {
+        self.checkout = checkout
+        self.runner = runner
+    }
+
+    var count: Int { categories.reduce(0) { $0 + $1.commands.count } }
+
+    /// What the pane's title bar says under its title.
+    var subtitle: String { "\(count) commands in \(categories.count) groups" }
+
+    /// The categories, with the search applied.
+    var shown: [CommandCatalog.Category] { CommandCatalog.filter(categories, search) }
+
+    /// Reads the list. mrk-menu is built, not checked out, so a checkout that
+    /// has not run make build-tools has none; one built before
+    /// 2026-11-05 refuses --json, and MrkRunner says this mrk is older.
+    func load() async {
+        phase = .loading
+        let tool = checkout.file(MrkCommand.menuList.script)
+        guard FileManager.default.isExecutableFile(atPath: tool.path) else {
+            categories = []
+            phase = .failed("mrk-menu is not built in \(checkout.root.path). Run make build-tools there.")
+            return
+        }
+        do {
+            let result = try await runner.run(.menuList, in: checkout)
+            switch CommandCatalog.read(result.stdout) {
+            case .success(let catalog):
+                categories = catalog.categories
+                phase = .loaded
+            case .failure(let failure):
+                categories = []
+                phase = .failed(failure.localizedDescription)
+            }
+        } catch {
+            categories = []
+            phase = .failed(error.localizedDescription)
+        }
     }
 }
 

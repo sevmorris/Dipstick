@@ -123,9 +123,29 @@ final class StubMrk {
             .split(separator: "\n").map(String.init)
     }
 
-    /// Each run of mrk-status: the log's lines that are not a script's.
+    /// Each run of mrk-status: the log's lines that are not a script's, nor
+    /// mrk-menu's.
     var statusCalls: [String] {
-        calls.filter { !$0.hasPrefix("scripts/") }
+        calls.filter { !$0.hasPrefix("scripts/") && !$0.hasPrefix("bin/") }
+    }
+
+    /// Gives the checkout a bin/mrk-menu, as make build-tools builds it, that
+    /// logs its run as a script's stub does and prints JSON to stdout and ERR
+    /// to stderr, then exits with STATUS.
+    func menu(_ json: String, err: String = "", status: Int32 = 0) throws {
+        try FileManager.default.createDirectory(at: root.appendingPathComponent("bin"),
+                                                withIntermediateDirectories: true)
+        try write("fixtures/mrk-menu.json", json)
+        try write("fixtures/mrk-menu.err", err)
+        let url = root.appendingPathComponent("bin/mrk-menu")
+        try """
+        #!/bin/bash
+        { printf 'bin/mrk-menu'; printf ' [%s]' "$@"; printf ' cwd=%s\\n' "$PWD"; } >> "\(log.path)"
+        cat "\(root.path)/fixtures/mrk-menu.json"
+        cat "\(root.path)/fixtures/mrk-menu.err" >&2
+        exit \(status)
+        """.write(to: url, atomically: true, encoding: .utf8)
+        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: url.path)
     }
 
     func runner() -> MrkRunner {
@@ -141,13 +161,17 @@ final class StubMrk {
     /// A model over this checkout, with no window, no login shell asked, and
     /// mrk Settings' store in this folder.
     /// No Barkeep, unless the test gives one, so a test never opens the real
-    /// one.
+    /// one. A command of the Commands pane is cancelled, and nothing opens a
+    /// terminal, unless the test says otherwise.
     @MainActor
     func model(findBarkeep: @escaping @MainActor () -> URL? = { nil },
-               openInBarkeep: @escaping @MainActor (URL) -> Void = { _ in }) -> StatusModel {
+               openInBarkeep: @escaping @MainActor (URL) -> Void = { _ in },
+               confirmCommand: @escaping StatusModel.CommandConfirmer = { _, _ in nil },
+               launchTerminal: @escaping StatusModel.TerminalStarter = { _, _, _ in }) -> StatusModel {
         let env = ["PATH": "/usr/bin:/bin", "HOME": dir.path, "MRK_ROOT": root.path,
                    "DIPSTICK_MRK_STATUS": mrkStatus.path]
         return StatusModel(home: dir.path, opensWindows: false, environment: { env }, settingsStore: store(),
-                           findBarkeep: findBarkeep, openInBarkeep: openInBarkeep)
+                           findBarkeep: findBarkeep, openInBarkeep: openInBarkeep,
+                           confirmCommand: confirmCommand, launchTerminal: launchTerminal)
     }
 }
