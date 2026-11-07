@@ -4,10 +4,13 @@ All notable changes to Dipstick are documented here. Every released version has 
 
 Write a version's entry before releasing it, and put the same prose in `release-notes/v<version>.md`: `release.sh` publishes that file as the release's notes, and stops before building anything when it is absent.
 
-## [Unreleased]
+## [0.11] — 2026-11-07
 
 **Added**
 - **A way to Full Disk Access from the menu bar.** Time Machine's settings can be read only by an app with Full Disk Access, which macOS never asks for, so without it the Time Machine panel said only "operation not permitted". With an mrk from 2026-11-07 or later (`make pull`), the line says it needs Full Disk Access, and a **Full Disk Access…** button beside it opens the pane in System Settings where you turn Dipstick on. Then quit and reopen Dipstick.
+
+**Updating**
+- From 0.8, **Update and Relaunch** installs this version in place. The button needs an mrk from 2026-11-07 or later (`make pull`); with an older one, the menu bar is as in 0.10.
 
 ## [0.10] — 2026-11-07
 
