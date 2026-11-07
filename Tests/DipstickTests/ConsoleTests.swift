@@ -322,4 +322,33 @@ final class ConsoleTerminalTests: XCTestCase {
         XCTAssertFalse(text.contains("Choose"), "the picker is gone: \(text)")
         XCTAssertTrue(text.hasSuffix("three\ntwo\n[exited 0]"), text)
     }
+
+    /// Switching the screen between Plain and a tube keeps the terminal's
+    /// size and what is on it. A branch in PhosphorScreen once made the
+    /// screen view again at each switch, and its first layout, at zero size,
+    /// cut every row to two columns: `[exited 0]` became `[e`.
+    func testSwitchingTheScreensLookKeepsItsSizeAndText() async throws {
+        _ = NSApplication.shared
+        UserDefaults.app.set(PhosphorStyle.plain.rawValue, forKey: "consoleStyle")
+        defer { UserDefaults.app.removeObject(forKey: "consoleStyle") }
+        let session = ConsoleSession(command: "print -r -- '  ✓ Dry run: nothing was committed or pushed.'")
+        let controller = ConsoleWindowController(session: session, close: {}, closed: {})
+        defer { controller.close() }
+        let window = try XCTUnwrap(controller.window)
+        window.layoutIfNeeded()
+        try await wait(for: { session.columns != 80 || session.rows != 24 }, "the screen's size")
+        let size = ConsoleMetrics.Size(columns: session.columns, rows: session.rows)
+        await session.run(environment: environment, directory: scratch.path)
+        let text = session.screen.text
+        XCTAssertTrue(text.hasSuffix("\n  ✓ Dry run: nothing was committed or pushed.\n[exited 0]"), text)
+
+        for style in [PhosphorStyle.amber, .plain, .green, .plain] {
+            UserDefaults.app.set(style.rawValue, forKey: "consoleStyle")
+            try await Task.sleep(for: .milliseconds(300))
+            window.layoutIfNeeded()
+            try await Task.sleep(for: .milliseconds(100))
+            XCTAssertEqual(ConsoleMetrics.Size(columns: session.columns, rows: session.rows), size, style.label)
+            XCTAssertEqual(session.screen.text, text, style.label)
+        }
+    }
 }

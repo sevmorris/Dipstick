@@ -375,14 +375,40 @@ final class ConsoleMetricsTests: XCTestCase {
         let inset = TubeFace().boxInset(for: CGSize(width: tube, height: tube))
         let scroller = NSScroller.scrollerWidth(for: .regular, scrollerStyle: .legacy)
         let room = NSSize(width: tube - 2 * inset - scroller, height: tube - 2 * inset)
-        XCTAssertGreaterThanOrEqual(ConsoleMetrics.cells(in: room).columns, 80)
+        XCTAssertGreaterThanOrEqual(ConsoleMetrics.cells(in: room)?.columns ?? 0, 80)
     }
 
     func testCells() {
         let size = ConsoleMetrics.cells(in: NSSize(width: 2 * 10 + 2 * 5 + 100 * ConsoleMetrics.advance + 1,
                                                    height: 2 * 8 + 30 * ConsoleMetrics.lineHeight + 1))
         XCTAssertEqual(size, .init(columns: 100, rows: 30))
-        XCTAssertEqual(ConsoleMetrics.cells(in: .zero), .init(columns: 2, rows: 2))
+    }
+
+    /// A view not laid out yet is no size at all, never a terminal of 2 × 2:
+    /// a resize to that would cut every row on the screen.
+    func testAViewNotLaidOutIsNoSize() {
+        XCTAssertNil(ConsoleMetrics.cells(in: .zero))
+        XCTAssertNil(ConsoleMetrics.cells(in: NSSize(width: 800, height: 0)))
+        XCTAssertNil(ConsoleMetrics.cells(in: NSSize(width: 0, height: 600)))
+        XCTAssertNil(ConsoleMetrics.cells(in: NSSize(width: 2 * 10 + 2 * 5 + ConsoleMetrics.advance, height: 600)))
+        XCTAssertEqual(ConsoleMetrics.cells(in: NSSize(width: 2 * 10 + 2 * 5 + 2 * ConsoleMetrics.advance,
+                                                      height: 2 * 8 + 2 * ConsoleMetrics.lineHeight)),
+                       .init(columns: 2, rows: 2))
+    }
+}
+
+final class ConsolePainterTests: XCTestCase {
+    /// A character SF Mono lacks still takes its cells, so the rest of its
+    /// row lines up with the rows under it: mrk-status's ⚠ is drawn in
+    /// Menlo, which is narrower.
+    func testEveryCharacterTakesItsCells() {
+        let painter = ConsolePainter(style: .green)
+        for (text, cells) in [("a…b", 3), ("a⚠b", 3), ("✔ ok", 4), ("日本x", 5), ("✅x", 3)] {
+            let width = painter.text([TerminalScreen.Run(text: text, style: .init())]).size().width
+            XCTAssertEqual(width, CGFloat(cells) * ConsoleMetrics.advance, accuracy: 0.05, text)
+        }
+        let bold = painter.text([TerminalScreen.Run(text: "⚠ x", style: .init(bold: true))]).size().width
+        XCTAssertEqual(bold, 3 * ConsoleMetrics.advance, accuracy: 0.05)
     }
 }
 

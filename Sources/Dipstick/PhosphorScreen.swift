@@ -152,36 +152,39 @@ struct PhosphorScreen<Content: View>: View {
 
     private let face = TubeFace()
 
+    /// One chain of modifiers for every style, each changing with it, and no
+    /// `if` around `content`: a branch for Plain would give the content a new
+    /// identity at each switch, and SwiftUI would make the console's screen
+    /// again, which lays itself out at zero size first.
     var body: some View {
-        if style == .plain {
-            content
-                .background(style.ground)
-                .clipShape(RoundedRectangle(cornerRadius: 6))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 6)
-                        .stroke(.separator, lineWidth: 1)
-                )
-        } else {
-            content
-                .foregroundStyle(style.tint)
-                .background { tube }
-                .overlay { scanlines }
-                .overlay { if !reduceMotion && appIsActive { RefreshSweep(tint: style.tint) } }
-                .overlay { glass }
-                .clipShape(face)
-                .overlay { bezel }
-                .onAppear { appIsActive = NSApplication.shared.isActive }
-                .onReceive(NotificationCenter.default.publisher(
-                    for: NSApplication.didBecomeActiveNotification
-                )) { _ in
-                    appIsActive = true
+        let plain = style == .plain
+        content
+            .foregroundStyle(style.tint)
+            .background {
+                if plain { style.ground } else { tube }
+            }
+            .overlay { if !plain { scanlines } }
+            .overlay { if !plain && !reduceMotion && appIsActive { RefreshSweep(tint: style.tint) } }
+            .overlay { if !plain { glass } }
+            .clipShape(plain ? AnyShape(RoundedRectangle(cornerRadius: 6)) : AnyShape(face))
+            .overlay {
+                if plain {
+                    RoundedRectangle(cornerRadius: 6).stroke(.separator, lineWidth: 1)
+                } else {
+                    bezel
                 }
-                .onReceive(NotificationCenter.default.publisher(
-                    for: NSApplication.didResignActiveNotification
-                )) { _ in
-                    appIsActive = false
-                }
-        }
+            }
+            .onAppear { appIsActive = NSApplication.shared.isActive }
+            .onReceive(NotificationCenter.default.publisher(
+                for: NSApplication.didBecomeActiveNotification
+            )) { _ in
+                appIsActive = true
+            }
+            .onReceive(NotificationCenter.default.publisher(
+                for: NSApplication.didResignActiveNotification
+            )) { _ in
+                appIsActive = false
+            }
     }
 
     private var tube: some View {
@@ -331,9 +334,13 @@ final class TubeClipView: NSView {
         // Sit the whole text box inside the curve rather than letting it run
         // to the edges and relying on the mask to cut it. The mask stays as a
         // backstop, but nothing should be reaching it.
+        // On whole backing pixels, inward: the clip view inside rounds itself
+        // to them, and one rounded up past the scroll view's frame made the
+        // text a fraction taller than the screen, which shows a scroller
+        // that always shows over nothing.
         if let scrollView = subviews.first as? NSScrollView {
             let inset = TubeFace().boxInset(for: bounds.size)
-            scrollView.frame = bounds.insetBy(dx: inset, dy: inset)
+            scrollView.frame = backingAlignedRect(bounds.insetBy(dx: inset, dy: inset), options: .alignAllEdgesInward)
         }
         applyEdgeFade()
         CATransaction.commit()

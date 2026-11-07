@@ -48,7 +48,10 @@ struct ConsoleScreenView: NSViewRepresentable {
 
         let coordinator = context.coordinator
         scrollView.onTile = { [weak scrollView, weak textView] in
-            guard let scrollView, let textView else { return }
+            // Not before the view is in a window: a screen made again lays
+            // itself out at zero size first, and a resize to that would cut
+            // every row on the screen and tell the program it has none.
+            guard let scrollView, let textView, scrollView.window != nil else { return }
             let padding = textView.textContainer?.lineFragmentPadding ?? 0
             // A scroller that always shows takes its width whether or not it
             // shows yet, so the columns do not change when the output first
@@ -57,8 +60,8 @@ struct ConsoleScreenView: NSViewRepresentable {
             if scrollView.scrollerStyle == .legacy {
                 room.width -= NSScroller.scrollerWidth(for: .regular, scrollerStyle: .legacy)
             }
-            let size = ConsoleMetrics.cells(in: room, padding: padding)
-            guard size != coordinator.reportedSize else { return }
+            guard let size = ConsoleMetrics.cells(in: room, padding: padding),
+                  size != coordinator.reportedSize else { return }
             coordinator.reportedSize = size
             // Not during AppKit's layout: the session's change updates
             // SwiftUI's views.
@@ -196,12 +199,16 @@ enum ConsoleMetrics {
     }()
 
     /// The characters that fit in a scroll view's content of `size`, inside
-    /// the text view's inset and the line's own `padding` at each end.
-    static func cells(in size: NSSize, padding: CGFloat = 5) -> Size {
+    /// the text view's inset and the line's own `padding` at each end; nil
+    /// for a size that holds fewer than 2 × 2, which is a view not laid out
+    /// yet, never a console: its window is at least 920 × 600.
+    static func cells(in size: NSSize, padding: CGFloat = 5) -> Size? {
         let width = size.width - 2 * inset.width - 2 * padding
         let height = size.height - 2 * inset.height
-        return Size(columns: max(2, Int((width / advance).rounded(.down))),
-                    rows: max(2, Int((height / lineHeight).rounded(.down))))
+        let columns = Int((width / advance).rounded(.down))
+        let rows = Int((height / lineHeight).rounded(.down))
+        guard columns >= 2, rows >= 2 else { return nil }
+        return Size(columns: columns, rows: rows)
     }
 }
 
@@ -209,7 +216,7 @@ enum ConsoleMetrics {
 final class ConsolePainter {
     let style: PhosphorStyle
     private var cache: [TerminalScreen.Style: [NSAttributedString.Key: Any]] = [:]
-    private var symbolFonts: [Unicode.Scalar: (regular: NSFont, bold: NSFont)?] = [:]
+    private var fallbacks: [Unicode.Scalar: Fallback?] = [:]
 
     init(style: PhosphorStyle) {
         self.style = style
@@ -252,14 +259,16 @@ final class ConsolePainter {
             let attributes = attributes(run.style)
             var plain = ""
             for scalar in run.text.unicodeScalars {
-                guard let symbol = symbolFont(for: scalar, bold: run.style.bold) else {
+                guard let fallback = fallback(for: scalar) else {
                     plain.unicodeScalars.append(scalar)
                     continue
                 }
                 text.append(NSAttributedString(string: plain, attributes: attributes))
                 plain = ""
                 var marked = attributes
-                marked[.font] = symbol
+                marked[.font] = run.style.bold ? fallback.bold : fallback.regular
+                let kern = run.style.bold ? fallback.boldKern : fallback.kern
+                if abs(kern) > 0.01 { marked[.kern] = kern }
                 text.append(NSAttributedString(string: String(scalar), attributes: marked))
             }
             text.append(NSAttributedString(string: plain, attributes: attributes))
@@ -267,23 +276,54 @@ final class ConsolePainter {
         return text
     }
 
-    /// Menlo, for a mark SF Mono lacks and Menlo has: mrk's ⚠, and ✔.
-    /// TextKit's own fallback finds those in Apple Color Emoji, a picture no
-    /// tint reaches, and a cascade list on the font does not change its mind
-    /// (tried on 2026-10-22).
-    private func symbolFont(for scalar: Unicode.Scalar, bold: Bool) -> NSFont? {
-        guard scalar.value > 0x7F, scalar.value <= 0xFFFF else { return nil }
-        if let known = symbolFonts[scalar] { return known.map { bold ? $0.bold : $0.regular } }
-        var unit = UniChar(scalar.value)
-        var glyph: CGGlyph = 0
-        let lacking = !CTFontGetGlyphsForCharacters(PhosphorType.bodyFont, &unit, &glyph, 1)
-        var fonts: (regular: NSFont, bold: NSFont)?
-        if lacking, let regular = NSFont(name: "Menlo-Regular", size: PhosphorType.bodySize),
-           CTFontGetGlyphsForCharacters(regular, &unit, &glyph, 1) {
-            fonts = (regular, NSFont(name: "Menlo-Bold", size: PhosphorType.bodySize) ?? regular)
+    /// The font for a character SF Mono lacks, and the kern that makes it
+    /// take its cells, so a row lines up with the rows under it. Menlo, when
+    /// it has the character: mrk's ⚠, and ✔. TextKit's own fallback finds
+    /// those in Apple Color Emoji, a picture no tint reaches, and a cascade
+    /// list on the font does not change its mind (tried on 2026-10-22).
+    /// Otherwise the font CoreText falls back to. Menlo is 9.03 pt wide to
+    /// SF Mono's 9.27, so each ⚠ moved the rest of its row left until it was
+    /// kerned (found on mrk-status's warning rows on 2026-11-06).
+    private func fallback(for scalar: Unicode.Scalar) -> Fallback? {
+        guard scalar.value > 0x7F else { return nil }
+        if let known = fallbacks[scalar] { return known }
+        let made = Self.makeFallback(scalar)
+        fallbacks[scalar] = made
+        return made
+    }
+
+    private struct Fallback {
+        let regular: NSFont
+        let bold: NSFont
+        let kern: CGFloat
+        let boldKern: CGFloat
+    }
+
+    private static func makeFallback(_ scalar: Unicode.Scalar) -> Fallback? {
+        let string = String(scalar)
+        let units = Array(string.utf16)
+        var glyphs = [CGGlyph](repeating: 0, count: units.count)
+        if CTFontGetGlyphsForCharacters(PhosphorType.bodyFont, units, &glyphs, units.count) { return nil }
+        // A combining mark has no cell of its own to fill.
+        let cells = TerminalScreen.width(of: scalar)
+        guard cells > 0 else { return nil }
+        let regular: NSFont
+        let bold: NSFont
+        if let menlo = NSFont(name: "Menlo-Regular", size: PhosphorType.bodySize),
+           CTFontGetGlyphsForCharacters(menlo, units, &glyphs, units.count) {
+            regular = menlo
+            bold = NSFont(name: "Menlo-Bold", size: PhosphorType.bodySize) ?? menlo
+        } else {
+            let cascade = CTFontCreateForString(PhosphorType.bodyFont, string as CFString,
+                                                CFRange(location: 0, length: units.count)) as NSFont
+            regular = cascade
+            bold = cascade
         }
-        symbolFonts[scalar] = fonts
-        return fonts.map { bold ? $0.bold : $0.regular }
+        let width = CGFloat(cells) * ConsoleMetrics.advance
+        func advance(_ font: NSFont) -> CGFloat {
+            (string as NSString).size(withAttributes: [.font: font]).width
+        }
+        return Fallback(regular: regular, bold: bold, kern: width - advance(regular), boldKern: width - advance(bold))
     }
 
     func attributes(_ s: TerminalScreen.Style) -> [NSAttributedString.Key: Any] {
