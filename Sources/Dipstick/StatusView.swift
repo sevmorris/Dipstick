@@ -254,9 +254,29 @@ private struct LineRow: View {
             Spacer(minLength: 4)
             if !line.fix.isEmpty {
                 FixButton(command: line.fix, model: model)
+            } else if line.needsFullDiskAccess {
+                FullDiskAccessButton()
             }
         }
         .padding(.leading, CGFloat(line.indent) * 14)
+    }
+}
+
+/// For a line mrk-status cannot check without Full Disk Access, such as Time
+/// Machine's settings: a way to the pane where it is given. macOS never asks
+/// for Full Disk Access, so without this the line was a dead end (2026-11-07).
+private struct FullDiskAccessButton: View {
+    var body: some View {
+        Button {
+            FullDiskAccess.open()
+        } label: {
+            Label("Full Disk Access…", systemImage: "lock.shield")
+                .font(.caption)
+                .lineLimit(1)
+        }
+        .controlSize(.small)
+        .help("Open System Settings → Privacy & Security → Full Disk Access. Turn Dipstick on there, "
+              + "then quit and reopen Dipstick, which macOS needs before the permission takes effect")
     }
 }
 
