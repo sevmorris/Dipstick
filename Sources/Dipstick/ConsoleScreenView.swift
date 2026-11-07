@@ -53,13 +53,14 @@ struct ConsoleScreenView: NSViewRepresentable {
             // every row on the screen and tell the program it has none.
             guard let scrollView, let textView, scrollView.window != nil else { return }
             let padding = textView.textContainer?.lineFragmentPadding ?? 0
-            // A scroller that always shows takes its width whether or not it
-            // shows yet, so the columns do not change when the output first
-            // runs past the bottom.
+            // The scroller's width is kept free whatever its style, so the
+            // columns change neither when the output first runs past the
+            // bottom nor when the style does: a scroll view can lay itself
+            // out once with overlay scrollers and then with ones that always
+            // show (CI's runners did), and macOS switches the style when a
+            // mouse is plugged in. Text then never sits under the scroller.
             var room = scrollView.frame.size
-            if scrollView.scrollerStyle == .legacy {
-                room.width -= NSScroller.scrollerWidth(for: .regular, scrollerStyle: .legacy)
-            }
+            room.width -= NSScroller.scrollerWidth(for: .regular, scrollerStyle: .legacy)
             guard let size = ConsoleMetrics.cells(in: room, padding: padding),
                   size != coordinator.reportedSize else { return }
             coordinator.reportedSize = size

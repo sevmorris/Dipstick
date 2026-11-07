@@ -350,5 +350,19 @@ final class ConsoleTerminalTests: XCTestCase {
             XCTAssertEqual(ConsoleMetrics.Size(columns: session.columns, rows: session.rows), size, style.label)
             XCTAssertEqual(session.screen.text, text, style.label)
         }
+
+        // Nor does the scroller's style change the size: CI's runners laid
+        // the screen out once with overlay scrollers and then with ones that
+        // always show, and plugging in a mouse switches them.
+        func scrollView(in view: NSView) -> NSScrollView? {
+            (view as? NSScrollView) ?? view.subviews.lazy.compactMap(scrollView(in:)).first
+        }
+        let screen = try XCTUnwrap(window.contentView.flatMap(scrollView(in:)))
+        for scrollers in [NSScroller.Style.overlay, .legacy, .overlay] {
+            screen.scrollerStyle = scrollers
+            screen.tile()
+            try await Task.sleep(for: .milliseconds(100))
+            XCTAssertEqual(ConsoleMetrics.Size(columns: session.columns, rows: session.rows), size, "\(scrollers.rawValue)")
+        }
     }
 }
