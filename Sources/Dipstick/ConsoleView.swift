@@ -20,17 +20,29 @@ struct ConsoleWindowView: View {
             header
             PhosphorScreen(style: style) {
                 ConsoleScreenView(screen: session.screen, style: style,
-                                  accepting: session.state == .running) { session.type($0) }
+                                  accepting: session.state == .running,
+                                  onType: { session.type($0) },
+                                  onResize: { session.resize(columns: $0, rows: $1) })
             }
             .padding(.horizontal, 16)
             footer
         }
-        // Wide enough for the 80 columns the terminal says it has, with the
-        // tube's bezel and a scroller that always shows: 80 × 9 pt of SF Mono
-        // 15, and about 100 pt around it.
-        .frame(minWidth: 860, idealWidth: 860, maxWidth: .infinity,
-               minHeight: 460, idealHeight: 560, maxHeight: .infinity)
+        .frame(minWidth: Self.minimumSize.width, idealWidth: Self.minimumSize.width, maxWidth: .infinity,
+               minHeight: Self.minimumSize.height, idealHeight: Self.idealHeight, maxHeight: .infinity)
+        .onChange(of: styleRaw, initial: true) {
+            let colors = ConsolePainter(style: style).reportedColors
+            session.reportColors(foreground: colors.foreground, background: colors.background)
+        }
     }
+
+    /// The terminal is as many characters as the tube holds, and the window
+    /// is never smaller than 80 × 22, the least mrk-menu draws in. A cell of
+    /// SF Mono 15 is 9.27 × 18 pt; around the text are its inset, a scroller
+    /// that always shows, and the bezel, which grows with the tube, to about
+    /// 41 pt a side on a tube as tall as it is wide (ConsoleMetricsTests).
+    static let minimumSize = NSSize(width: 920, height: 600)
+    /// Tall enough for 24 rows and more, as a terminal window opens.
+    static let idealHeight: CGFloat = 660
 
     private var header: some View {
         HStack(spacing: 10) {

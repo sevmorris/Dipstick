@@ -21,14 +21,15 @@ final class ConsoleWindowController: NSWindowController, NSWindowDelegate {
         self.session = session
         self.closed = closed
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 860, height: 560),
+            contentRect: NSRect(x: 0, y: 0, width: ConsoleWindowView.minimumSize.width,
+                                height: ConsoleWindowView.idealHeight),
             styleMask: [.titled, .closable, .miniaturizable, .resizable],
             backing: .buffered, defer: false)
         window.title = "Dipstick"
         window.isReleasedWhenClosed = false
         window.tabbingMode = .disallowed
         window.contentView = NSHostingView(rootView: ConsoleWindowView(session: session, close: close))
-        window.contentMinSize = NSSize(width: 860, height: 460)
+        window.contentMinSize = ConsoleWindowView.minimumSize
         super.init(window: window)
         window.delegate = self
         window.center()

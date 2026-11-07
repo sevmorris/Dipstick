@@ -26,21 +26,12 @@ final class CommandCatalogTests: XCTestCase {
 
         let push = try command("sync --push", in: catalog)
         XCTAssertEqual(push.command, "scripts/sync --push")
-        XCTAssertTrue(push.terminal)
         XCTAssertEqual(push.typeToConfirm, "")
         XCTAssertFalse(push.description.isEmpty)
 
         XCTAssertEqual(try command("make doctor ARGS=--fix", in: catalog).command, "make doctor ARGS=--fix")
         XCTAssertEqual(try command("mrk-push", in: catalog).command, "bin/mrk-push")
         XCTAssertEqual(try command("nuke-mrk", in: catalog).typeToConfirm, "nuke")
-    }
-
-    /// The commands that must not run in the console: those that can start a
-    /// picker, and update-full and nuke-mrk.
-    func testTheRealListMarksTheTerminalCommands() throws {
-        let terminal = try realList().categories.flatMap(\.commands).filter(\.terminal).map(\.name)
-        XCTAssertEqual(terminal, ["sync --push", "sync-login-items -c", "sync", "sync --prune", "sync --dry-run",
-                                  "sync-login-items", "update-full", "nuke-mrk"])
     }
 
     /// Each command's line names a tool of the checkout or make, as a fix's
@@ -150,9 +141,8 @@ final class CommandsPaneTests: XCTestCase {
         XCTAssertTrue(message.contains("bin/mrk-menu does not take --json"), message)
     }
 
-    private func entry(_ name: String, _ line: String, terminal: Bool = false, word: String = "") -> CommandCatalog.Command {
-        CommandCatalog.Command(name: name, description: "what it does", command: line,
-                               terminal: terminal, typeToConfirm: word)
+    private func entry(_ name: String, _ line: String, word: String = "") -> CommandCatalog.Command {
+        CommandCatalog.Command(name: name, description: "what it does", command: line, typeToConfirm: word)
     }
 
     /// A command runs as it is written, in the console: make defaults runs
@@ -182,42 +172,44 @@ final class CommandsPaneTests: XCTestCase {
         model.closeConsole()
     }
 
-    /// A command the list marks terminal opens a terminal, in the checkout,
-    /// and never the console.
-    func testATerminalCommandOpensATerminal() async throws {
+    /// A command mrk-menu --json marks `terminal`, for a program that cannot
+    /// draw a full screen, as it marks sync --push, runs in the console like
+    /// the rest.
+    func testATerminalCommandRunsInTheConsole() async throws {
         let stub = try StubMrk()
-        var opened: [String] = []
-        let model = stub.model(confirmCommand: { _, _ in "" },
-                               launchTerminal: { command, directory, _ in opened.append("\(command) in \(directory)") })
+        try stub.write("Makefile", "sync:\n\t@echo synced $(ARGS)\n")
+        let model = stub.model(confirmCommand: { _, _ in "" })
         _ = await model.settingsModel()
 
-        let task = model.runCommand(entry("sync --push", "scripts/sync --push", terminal: true))
+        await model.runCommand(entry("sync --push", "make sync ARGS=--push"))?.value
 
-        XCTAssertNil(task)
-        XCTAssertEqual(opened, ["scripts/sync --push in \(stub.root.path)"])
-        XCTAssertNil(model.console)
+        let session = try XCTUnwrap(model.console)
+        XCTAssertEqual(session.command, "make sync ARGS=--push")
+        XCTAssertEqual(session.state, .exited(0))
+        XCTAssertTrue(session.screen.text.contains("synced --push"), session.screen.text)
+        model.closeConsole()
     }
 
     /// nuke-mrk runs only when its word is typed. Cancel runs nothing either.
     func testACommandWithAWordRunsOnlyWithThatWord() async throws {
         let stub = try StubMrk()
+        try stub.write("Makefile", "nuke:\n\t@echo nuked\n")
         var answer: String? = "nuk"
-        var opened: [String] = []
-        let model = stub.model(confirmCommand: { _, _ in answer },
-                               launchTerminal: { command, _, _ in opened.append(command) })
-        let nuke = entry("nuke-mrk", "bin/nuke-mrk", terminal: true, word: "nuke")
+        let model = stub.model(confirmCommand: { _, _ in answer })
+        let nuke = entry("nuke-mrk", "make nuke", word: "nuke")
 
-        model.runCommand(nuke)
+        XCTAssertNil(model.runCommand(nuke))
         answer = "Nuke"
-        model.runCommand(nuke)
+        XCTAssertNil(model.runCommand(nuke))
         answer = nil
-        model.runCommand(nuke)
-        XCTAssertEqual(opened, [])
+        XCTAssertNil(model.runCommand(nuke))
+        XCTAssertNil(model.console)
 
         answer = "nuke"
-        model.runCommand(nuke)
-        XCTAssertEqual(opened, ["bin/nuke-mrk"])
-        XCTAssertNil(model.console)
+        await model.runCommand(nuke)?.value
+        XCTAssertEqual(model.console?.command, "make nuke")
+        XCTAssertEqual(model.console?.state, .exited(0))
+        model.closeConsole()
     }
 
     /// Cancel runs nothing.

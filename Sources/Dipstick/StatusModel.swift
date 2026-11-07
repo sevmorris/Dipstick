@@ -21,15 +21,12 @@ final class StatusModel {
     /// mrk Settings' model: made the first time the window opens, and kept,
     /// so each pane keeps what it read.
     private(set) var settings: SettingsModel?
-    /// The Make targets whose fixes run in a terminal, as the checkout's
-    /// mrk-contract names them, read at each refresh (TerminalLauncher).
-    private(set) var terminalTargets = TerminalLauncher.fullScreenTargets
     /// The installed Barkeep that opens its Untracked list from a link, found
     /// at each refresh: the fix for a package that the Brewfile lacks goes
     /// there (BarkeepLink). Nil without one.
     private(set) var barkeepApp: URL?
     /// Runs mrk's scripts for mrk Settings, and keeps each checkout's
-    /// contract, which the refresh reads too.
+    /// contract.
     @ObservationIgnored private(set) lazy var runner = MrkRunner(environment: { [weak self] in
         await self?.resolvedEnvironment() ?? [:]
     })
@@ -53,9 +50,6 @@ final class StatusModel {
     /// typed ("" with nothing to type), or nil for Cancel: an alert, unless a
     /// test gives its own answer.
     private let confirmCommand: CommandConfirmer
-    /// Starts a command in a terminal window: TerminalLauncher, unless a test
-    /// gives its own, so that no test opens Terminal.
-    private let launchTerminal: TerminalStarter
     /// Set when a fix ends while mrk-status runs. That run read mrk as it
     /// was, so it goes round again.
     @ObservationIgnored private var changedDuringRefresh = false
@@ -79,8 +73,7 @@ final class StatusModel {
          environment: EnvironmentProvider? = nil, settingsStore: UserDefaults = .app,
          findBarkeep: (@MainActor () -> URL?)? = nil,
          openInBarkeep: @escaping @MainActor (URL) -> Void = { BarkeepLink.open(in: $0) },
-         confirmCommand: @escaping CommandConfirmer = StatusModel.askToRun,
-         launchTerminal: @escaping TerminalStarter = { try TerminalLauncher.run(command: $0, directory: $1, exports: $2) }) {
+         confirmCommand: @escaping CommandConfirmer = StatusModel.askToRun) {
         self.home = home
         self.opensWindows = opensWindows
         self.settingsStore = settingsStore
@@ -88,11 +81,9 @@ final class StatusModel {
         self.findBarkeep = findBarkeep ?? { BarkeepLink.installedApp(home: home) }
         self.openInBarkeep = openInBarkeep
         self.confirmCommand = confirmCommand
-        self.launchTerminal = launchTerminal
     }
 
     typealias CommandConfirmer = @MainActor (_ command: CommandCatalog.Command, _ directory: String) -> String?
-    typealias TerminalStarter = @MainActor (_ command: String, _ directory: String, _ exports: [String: String]) throws -> Void
 
     /// What a terminal window on this Mac has, or Dipstick's own environment
     /// with the usual PATH when the shell cannot be asked.
@@ -161,9 +152,7 @@ final class StatusModel {
                 environment = await environmentProvider()
                 await runner.forgetEnvironment()
             }
-            // Before the report, so its fix buttons show where they run. A
-            // make pull that changes mrk-contract changes the targets.
-            terminalTargets = TerminalLauncher.targets(in: await runner.contract(for: checkout))
+            // Before the report, so its fix buttons show where they go.
             barkeepApp = findBarkeep()
 
             switch await StatusRunner.fetch(environment: environment ?? [:], home: home) {
@@ -196,26 +185,20 @@ final class StatusModel {
         return env
     }
 
-    /// Whether `command` draws a full screen, and so runs in a terminal and
-    /// not in the console: TerminalLauncher.isNeeded, with the checkout's
-    /// targets.
-    func needsTerminal(_ command: String) -> Bool {
-        TerminalLauncher.isNeeded(for: command, targets: terminalTargets)
-    }
-
     /// Whether Barkeep makes `command`'s fix in its Untracked list: the fix is
     /// `make sync`, and an installed Barkeep opens the list from its link.
     func opensInBarkeep(_ command: String) -> Bool {
         barkeepApp != nil && BarkeepLink.makes(command)
     }
 
-    /// Runs `command` in the checkout, as the TUI's `f` does: in Dipstick's
-    /// console, or in a terminal for the few fixes that draw a full screen
-    /// (`needsTerminal`). A fix asks first, as `f` does. A fix that a pane of
-    /// mrk Settings makes instead (FixRoute) opens that pane: it shows what
-    /// the fix would change, and runs nothing until asked. So does the fix
-    /// that Barkeep makes (`opensInBarkeep`): it opens Barkeep's Untracked
-    /// list.
+    /// Runs `command` in the checkout, as the TUI's `f` does, in Dipstick's
+    /// console: the fixes that draw a full screen too, mrk-menu and the
+    /// pickers of sync, sync-login-items and brew, since the console is a
+    /// terminal that draws one. A fix asks first, as `f` does. A fix that a
+    /// pane of mrk Settings makes instead (FixRoute) opens that pane: it
+    /// shows what the fix would change, and runs nothing until asked. So does
+    /// the fix that Barkeep makes (`opensInBarkeep`): it opens Barkeep's
+    /// Untracked list.
     func run(_ command: String, confirm: Bool = true) {
         if opensInBarkeep(command), let app = barkeepApp {
             openInBarkeep(app)
@@ -225,40 +208,30 @@ final class StatusModel {
             openSettings(route.pane, withTrackpad: route.withTrackpad)
             return
         }
-        let inTerminal = needsTerminal(command)
         NSApp.activate()
         if confirm {
             let alert = NSAlert()
-            alert.messageText = inTerminal ? "Run this in a terminal?" : "Run this in Dipstick's console?"
+            alert.messageText = "Run this in Dipstick's console?"
             alert.informativeText = "\(command)\n\nin \(tilde(repoRoot))"
-                + (inTerminal ? "\n\nIt draws a full-screen picker, which needs a terminal of its own." : "")
             alert.addButton(withTitle: "Run")
             alert.addButton(withTitle: "Cancel")
             guard alert.runModal() == .alertFirstButtonReturn else { return }
         }
-        if inTerminal {
-            runInTerminal(command)
-        } else {
-            Task { await runInConsole(command) }
-        }
+        Task { await runInConsole(command) }
     }
 
     /// Runs one of mrk-menu's commands, from the Commands pane, exactly as it
-    /// is written, as mrk-menu does: in a terminal when the list marks it
-    /// `terminal`, and in the console otherwise. Unlike `run`, it never opens
-    /// a pane or Barkeep in its place, so a row does what its label says. It
+    /// is written, as mrk-menu does, in the console. mrk-menu --json marks
+    /// some `terminal`, for a program that cannot draw a full screen; the
+    /// console draws one, and runs them all. Unlike `run`, it never opens a
+    /// pane or Barkeep in its place, so a row does what its label says. It
     /// asks first, and a command with a word to type runs only when that
-    /// word was typed. The task, when it runs in the console, ends when the
-    /// command has exited.
+    /// word was typed. The task ends when the command has exited.
     @discardableResult
     func runCommand(_ command: CommandCatalog.Command) -> Task<Void, Never>? {
         guard let typed = confirmCommand(command, tilde(repoRoot)) else { return nil }
         guard command.typeToConfirm.isEmpty || typed == command.typeToConfirm else {
             NSSound.beep()
-            return nil
-        }
-        if command.terminal {
-            runInTerminal(command.command)
             return nil
         }
         return Task { await runInConsole(command.command) }
@@ -270,7 +243,7 @@ final class StatusModel {
     static func askToRun(_ command: CommandCatalog.Command, directory: String) -> String? {
         NSApp.activate()
         let alert = NSAlert()
-        alert.messageText = command.terminal ? "Run this in a terminal?" : "Run this in Dipstick's console?"
+        alert.messageText = "Run this in Dipstick's console?"
         var info = "\(command.command)\n\nin \(directory)\n\n\(command.description)"
         var field: NSTextField?
         if !command.typeToConfirm.isEmpty {
@@ -321,6 +294,11 @@ final class StatusModel {
             consoleWindow = window
             window?.show()
             updateDockPresence()
+            // The screen says how many characters it holds once it is laid
+            // out, on the next turn of the main queue, so the command starts
+            // at that size rather than at 80 × 24 and a resize.
+            window?.window?.layoutIfNeeded()
+            await Task.yield()
         }
         let shell = await resolvedEnvironment()
         await session.run(environment: Self.consoleEnvironment(shell, root: repoRoot), directory: repoRoot)
@@ -442,12 +420,17 @@ final class StatusModel {
     }
 
     /// The environment of a command in the console: the login shell's, as a
-    /// terminal window has it, on a terminal that draws what TERM=dumb
-    /// promises. The .command file exported MRK_ROOT, and so does this.
+    /// terminal window has it, with MRK_ROOT, on a terminal that draws what
+    /// xterm-256color promises (TerminalScreen).
     static func consoleEnvironment(_ shell: [String: String], root: String) -> [String: String] {
         var env = shell
         env["MRK_ROOT"] = root
-        env["TERM"] = "dumb"
+        env["TERM"] = "xterm-256color"
+        // What the login shell knew of a terminal it was started from, if
+        // any, is not this terminal.
+        for name in ["TERM_PROGRAM", "TERM_PROGRAM_VERSION", "TERM_SESSION_ID", "COLORTERM"] {
+            env[name] = nil
+        }
         // A pager would wait for keys the console does not send.
         env["PAGER"] = "cat"
         env["GIT_PAGER"] = "cat"
@@ -455,20 +438,6 @@ final class StatusModel {
         env["COLUMNS"] = nil
         env["LINES"] = nil
         return env
-    }
-
-    /// Opens a terminal running `command` in the checkout.
-    private func runInTerminal(_ command: String) {
-        var exports: [String: String] = [:]
-        for name in ["PATH", "MRK_ROOT"] {
-            if let value = environment?[name], !value.isEmpty { exports[name] = value }
-        }
-        do {
-            try launchTerminal(command, repoRoot, exports)
-        } catch {
-            let alert = NSAlert(error: error)
-            alert.runModal()
-        }
     }
 
     /// Asks GitHub for a newer Dipstick. Check for Updates… says what it found

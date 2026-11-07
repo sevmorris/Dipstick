@@ -161,17 +161,16 @@ final class StubMrk {
     /// A model over this checkout, with no window, no login shell asked, and
     /// mrk Settings' store in this folder.
     /// No Barkeep, unless the test gives one, so a test never opens the real
-    /// one. A command of the Commands pane is cancelled, and nothing opens a
-    /// terminal, unless the test says otherwise.
+    /// one. A command of the Commands pane is cancelled, unless the test says
+    /// otherwise.
     @MainActor
     func model(findBarkeep: @escaping @MainActor () -> URL? = { nil },
                openInBarkeep: @escaping @MainActor (URL) -> Void = { _ in },
-               confirmCommand: @escaping StatusModel.CommandConfirmer = { _, _ in nil },
-               launchTerminal: @escaping StatusModel.TerminalStarter = { _, _, _ in }) -> StatusModel {
+               confirmCommand: @escaping StatusModel.CommandConfirmer = { _, _ in nil }) -> StatusModel {
         let env = ["PATH": "/usr/bin:/bin", "HOME": dir.path, "MRK_ROOT": root.path,
                    "DIPSTICK_MRK_STATUS": mrkStatus.path]
         return StatusModel(home: dir.path, opensWindows: false, environment: { env }, settingsStore: store(),
                            findBarkeep: findBarkeep, openInBarkeep: openInBarkeep,
-                           confirmCommand: confirmCommand, launchTerminal: launchTerminal)
+                           confirmCommand: confirmCommand)
     }
 }

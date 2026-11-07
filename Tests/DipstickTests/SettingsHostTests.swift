@@ -3,7 +3,9 @@ import XCTest
 
 /// Which of mrk-status's fixes a pane of mrk Settings makes instead.
 final class FixRouteTests: XCTestCase {
-    /// Every fix mrk-status can offer, as TerminalLauncherTests lists them.
+    /// Every fix mrk-status can offer, from tools/mrk-status in mrk at
+    /// da7192c (2026-10-22): dailyFixes in daily.go, the installation checks'
+    /// fixes in main.go, and Dipstick's own two, StatusError.fix.
     func testTheFixesAPaneMakes() {
         XCTAssertEqual(FixRoute.route(for: "make snapshot-prefs"), FixRoute(pane: .preferences))
         XCTAssertEqual(FixRoute.route(for: "make sync-login-items ARGS=-c"), FixRoute(pane: .loginItems))
@@ -22,9 +24,12 @@ final class FixRouteTests: XCTestCase {
     }
 
     func testTheTargetPastOptionsAndVariables() {
-        XCTAssertEqual(TerminalLauncher.makeTarget(of: "make -s ARGS=-c sync-login-items"), "sync-login-items")
-        XCTAssertNil(TerminalLauncher.makeTarget(of: "bin/make defaults"))
-        XCTAssertNil(TerminalLauncher.makeTarget(of: "make"))
+        XCTAssertEqual(FixRoute.makeTarget(of: "make -s ARGS=-c sync-login-items"), "sync-login-items")
+        XCTAssertEqual(FixRoute.makeTarget(of: "make sync ARGS=--push"), "sync")
+        XCTAssertEqual(FixRoute.makeTarget(of: "make synced"), "synced")
+        XCTAssertNil(FixRoute.makeTarget(of: "bin/make defaults"))
+        XCTAssertNil(FixRoute.makeTarget(of: "make"))
+        XCTAssertNil(FixRoute.makeTarget(of: ""))
         XCTAssertNil(FixRoute.route(for: "make snapshot-prefs-check"))
     }
 }
@@ -91,7 +96,7 @@ final class SettingsHostTests: XCTestCase {
         XCTAssertEqual(session.state, .exited(0))
         let text = session.screen.text
         XCTAssertTrue(text.hasPrefix("$ make dock\n"), text)
-        XCTAssertTrue(text.contains("docked term=dumb root=\(stub.root.path)"), text)
+        XCTAssertTrue(text.contains("docked term=xterm-256color root=\(stub.root.path)"), text)
         XCTAssertTrue(stub.calls.contains { $0.hasPrefix("scripts/dock-setup [--check]") }, "\(stub.calls)")
         XCTAssertEqual(settings.dock.phase, .loaded)
         XCTAssertEqual(stub.statusCalls, ["--json"])

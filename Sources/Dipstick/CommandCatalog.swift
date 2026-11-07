@@ -3,8 +3,11 @@ import Foundation
 /// The `mrk-menu --json` document: mrk-menu's commands, in its categories and
 /// its order, for the Commands pane (BIN-1, mrk-menu). The list is mrk's, so
 /// a command mrk adds to the menu shows here with no Dipstick release, and
-/// Dipstick keeps no copy of it, as it keeps none of the Make targets that
-/// need a terminal (sevmorris/mrk audit 22, opportunity 5).
+/// Dipstick keeps no copy of it (sevmorris/mrk audit 22, opportunity 5).
+///
+/// Each command also has `terminal`, for one that a program must not run
+/// where it cannot draw a full screen. Dipstick reads no further than the
+/// keys below: its console draws one, and runs every command.
 struct CommandCatalog: Decodable, Equatable, Sendable {
     /// The schema this build reads. mrk raises it when a key changes meaning
     /// or goes away; a new key alone does not raise it.
@@ -27,10 +30,6 @@ struct CommandCatalog: Decodable, Equatable, Sendable {
         /// The line to run in the checkout, as a fix is: `bin/TOOL`,
         /// `scripts/TOOL` or `make TARGET`, with arguments that need no quotes.
         let command: String
-        /// Whether it must run in a terminal of its own: it can start
-        /// mrk-picker or gum, which the console cannot draw, or, as
-        /// update-full and nuke-mrk, it must not run inside Dipstick.
-        let terminal: Bool
         /// The word to type before it runs, as mrk-menu asks for nuke-mrk, or
         /// "" for none.
         let typeToConfirm: String
@@ -38,7 +37,7 @@ struct CommandCatalog: Decodable, Equatable, Sendable {
         var id: String { name }
 
         enum CodingKeys: String, CodingKey {
-            case name, description, command, terminal
+            case name, description, command
             case typeToConfirm = "type_to_confirm"
         }
     }

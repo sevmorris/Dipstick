@@ -45,8 +45,9 @@ and runs nothing until you ask:
 | `make defaults`, `make trackpad` | macOS Defaults |
 | `make dock` | Dock |
 
-Three things draw a full-screen picker, which the console cannot show:
-`make sync ARGS=--push`, `make brew` and the mrk-menu button. They open a terminal.
+Every other fix runs in Dipstick's console, the full-screen ones too:
+`make sync ARGS=--push` and `make brew` draw mrk-picker or gum there, and the
+mrk-menu button draws mrk-menu. Nothing opens Terminal.
 
 With Barkeep 1.17.0 or later installed, in `/Applications` or
 `~/Applications`, the fix for a package the Brewfile lacks, `make sync`, is a
@@ -64,18 +65,19 @@ installed copy by its path, never a build of Barkeep elsewhere.
 | macOS Defaults | `defaults.sh --check [--with-trackpad]`, with each key's section and `when` from `config/defaults.tsv` and its description from `docs/defaults/descriptions.tsv` | Each key's switch turns it off with `defaults.sh --skip` and `--revert`, and on with `--unskip` and `--key`, for every domain of the setting. **Apply This Key** runs `--key` for a key that differs or is absent. **Apply All…** runs `make defaults` (or `make trackpad`) in the console, after a confirmation that names the restart of Finder, the Dock and SystemUIServer |
 | Login Items | `config/login-items.txt` and `sync-login-items --check` | **Add**, **Ignore** and **Remove** run `sync-login-items --add`, `--ignore` and `--remove` |
 | Dock | `config/dock.txt` and `dock-setup --check` | Reordering, adding and removing write `config/dock.txt`, the plain list `dock-setup` reads. **Apply…** runs `make dock` in the console, after a confirmation |
-| Commands | `bin/mrk-menu --json`: mrk-menu's commands, in its groups and order | **Run…** runs a command exactly as the row shows it, in the checkout, after a confirmation: in Terminal when mrk-menu marks it `terminal`, and in the console otherwise. nuke-mrk runs only after you type `nuke`, as mrk-menu asks |
+| Commands | `bin/mrk-menu --json`: mrk-menu's commands, in its groups and order | **Run…** runs a command exactly as the row shows it, in the checkout, in the console, after a confirmation. nuke-mrk runs only after you type `nuke`, as mrk-menu asks |
 
 **The Commands pane runs what it shows.** Unlike a menu bar fix, a command
 there never opens another pane or Barkeep in its place: `make defaults` runs
-`make defaults` in the console, and `sync --push` opens Terminal with
-mrk-picker, as mrk-menu does. The list is mrk's
+`make defaults`, and `sync --push` runs sync with its mrk-picker, as mrk-menu
+does, both in the console. The list is mrk's
 ([sevmorris/mrk#156](https://github.com/sevmorris/mrk/pull/156)), so a command
-added to mrk-menu shows here with no Dipstick release. mrk marks a command
-`terminal` when it can start mrk-picker or gum, which the console cannot draw
-(the `sync` and `sync-login-items` commands), and for `update-full`, which
-quits every application except the terminal it runs in, and `nuke-mrk`, which
-moves `~/mrk` to the Trash. mrk-menu is built, not checked out: a checkout
+added to mrk-menu shows here with no Dipstick release. mrk marks some commands
+`terminal`, for a program that cannot draw a full screen; the console can, so
+Dipstick runs those there too. `update-full` keeps the console's Dipstick
+open when it quits every other application, as it keeps the terminal it runs
+in, and `nuke-mrk` moves `~/mrk`, the console's checkout, to the Trash, after
+asking at each step. mrk-menu is built, not checked out: a checkout
 without `bin/mrk-menu` needs `make build-tools`, and one whose mrk-menu
 predates `--json` needs `make pull`. A list of a later schema than Dipstick
 reads is refused, since a key whose meaning changed could make a row run
@@ -115,7 +117,7 @@ checkout: `config/dock.txt`; the login-items list, through
 `sync-login-items`; and the skip list, through `defaults.sh`. Committing stays
 with `mrk-push` and `pushall`, with their secret scan and gates, and the
 Unrecorded panel shows what is waiting. Barkeep's own edits wait the same way.
-The one fix that commits is mrk's: `make sync ARGS=--push` in a terminal, or,
+The one fix that commits is mrk's: `make sync ARGS=--push` in the console, or,
 with Barkeep 1.16.0 or later and its Commit and Push setting on, Barkeep's add,
 which runs `sync --push`. After each change, Dipstick runs `mrk-status` again.
 
@@ -127,10 +129,10 @@ mrk Settings.
 
 ## The console
 
-A command that changes the Mac or pushes runs in Dipstick's console: a window
-with a phosphor screen like Magic Backup Machine's, over a terminal of
-Dipstick's own. The fixes of the menu bar window and the commands of the panes
-use the same console, one command at a time. Dipstick runs the command with zsh
+Every command Dipstick runs for you runs in its console: a window with a
+phosphor screen like Magic Backup Machine's, over a terminal of Dipstick's
+own. The fixes of the menu bar window, the mrk-menu button and the commands of
+the panes use the same console, one command at a time. Dipstick runs the command with zsh
 in the checkout, with the login shell's environment and `MRK_ROOT`. You type in
 the console to answer what the command asks, such as `mrk-push`'s commit
 message, snapshot-prefs's secret scan or `sudo`'s password, and press Return.
@@ -138,10 +140,19 @@ message, snapshot-prefs's secret scan or `sudo`'s password, and press Return.
 the command exits, Dipstick reads the pane on screen again and runs
 `mrk-status` again.
 
-The terminal is a dumb one, 80 columns wide, and says so (`TERM=dumb`). It
-shows text, a program's colours and weights, and a line that writes over
-itself, as git's progress does. It has no full screen, and `PAGER` and
-`GIT_PAGER` are `cat`.
+The terminal is an xterm, as far as mrk's programs need one, and says so
+(`TERM=xterm-256color`). It is as many characters as the screen holds, never
+fewer than 80 columns, and tells the program when the window is resized. It
+draws a script's lines with their colours and weights, a line that writes over
+itself, as git's progress does, and the full-screen programs: gum's picker in
+place, and mrk-picker and mrk-menu on the alternate screen, which goes when
+they exit. The arrow keys, Escape, ⇧Tab and the function keys reach the
+program; Page Up and Down, Home and End reach a full-screen program, and
+scroll the console otherwise. It answers what a program asks of a terminal,
+such as the background colour lipgloss reads to choose its colours, which
+otherwise makes mrk-picker and mrk-menu wait five seconds before they draw.
+What scrolls off the top stays in the console, as the record of the run, and
+`PAGER` and `GIT_PAGER` are `cat`.
 
 While a command runs, the console's window does not close and Dipstick does not
 quit, so a command cannot be cut off between a commit and its push. The fix
@@ -150,7 +161,9 @@ the command, and the menu bar window names it with a Show button.
 
 The display button over the screen picks Phosphor Green, Phosphor Amber or
 Plain. A phosphor has one colour, so a program's red and green show in it, and
-bold glows brighter and dim fainter. Plain shows the colours.
+bold glows brighter and dim fainter, as does a colour past the basic sixteen
+by its brightness, so a picker's grey help text sits back. A background is a
+faint bar of the same light. Plain shows the colours.
 
 ## How it works
 
@@ -169,13 +182,6 @@ check modes and shows the result, so the app and the terminal always agree.
 - **Which mrk-status.** The first one found:
   `$DIPSTICK_MRK_STATUS`, then `$MRK_ROOT/bin/mrk-status`, then
   `~/bin/mrk-status`, then `~/mrk/bin/mrk-status`.
-- **Fixes in a terminal.** For the full-screen fixes, Dipstick writes the
-  command into a `.command` file and opens it. That starts the command in the
-  app that opens `.command` files (Terminal, unless another terminal has
-  claimed them). The file deletes itself when it runs. A full-screen fix is
-  one that starts `mrk-menu`, `mrk-picker` or `gum`, or one whose Make target
-  the checkout's `scripts/mrk-contract` lists under `terminal`. For an mrk
-  with no such list, the targets are `sync`, `sync-login-items` and `brew`.
 - **Updates.** Check for Updates… asks GitHub for a newer Dipstick. Dipstick
   also asks at launch and once a day without telling you, and when a newer
   version is out, the menu bar window's footer and mrk Settings' sidebar name
@@ -250,7 +256,8 @@ swift test            # the tests
 
 No test runs a real mrk command, touches real defaults or asks GitHub. The
 scripts and `mrk-status` are stubs in a temporary folder. The console's tests
-run zsh and make on a pseudo-terminal against a stub Makefile there. The app's
+run zsh and make on a pseudo-terminal against a stub Makefile there, and gum's
+picker when gum is installed. The app's
 settings go through `UserDefaults.app`, a scratch suite under tests, named by a
 path in the temporary folder.
 

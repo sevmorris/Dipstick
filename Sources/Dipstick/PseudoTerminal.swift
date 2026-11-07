@@ -184,6 +184,18 @@ final class PseudoTerminal: @unchecked Sendable {
         return true
     }
 
+    /// Tells the program its terminal is now `columns` × `rows`, as a
+    /// terminal window does when it is resized. macOS sends SIGWINCH to the
+    /// terminal's foreground process group when the size changes, and a
+    /// full-screen program draws again for it.
+    func resize(columns: UInt16, rows: UInt16) {
+        lock.lock()
+        defer { lock.unlock() }
+        guard master >= 0 else { return }
+        var size = winsize(ws_row: rows, ws_col: columns, ws_xpixel: 0, ws_ypixel: 0)
+        _ = ioctl(master, TIOCSWINSZ, &size)
+    }
+
     /// Sends `signal` to the program's process group, which is the program
     /// and what it started, make and the script under it: what ⌃C in a
     /// terminal reaches. Nothing once the program has exited.
