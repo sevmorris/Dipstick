@@ -37,7 +37,7 @@ final class BarkeepLinkTests: XCTestCase {
     }
 
     /// With Barkeep, the fix opens its Untracked list and runs nothing; the
-    /// button names Barkeep. Without one, the fix is the terminal's, as before.
+    /// button names Barkeep. Without one, the fix runs in the console.
     @MainActor
     func testTheSyncFixOpensBarkeepWhenThereIsOne() async throws {
         let stub = try StubMrk()
@@ -59,6 +59,6 @@ final class BarkeepLinkTests: XCTestCase {
         await none.refresh()
         XCTAssertNil(none.barkeepApp)
         XCTAssertFalse(none.opensInBarkeep("make sync ARGS=--push"))
-        XCTAssertTrue(none.needsTerminal("make sync ARGS=--push"))
+        XCTAssertNil(FixRoute.route(for: "make sync ARGS=--push"), "so it runs in the console")
     }
 }

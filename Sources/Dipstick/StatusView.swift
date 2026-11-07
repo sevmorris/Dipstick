@@ -82,7 +82,7 @@ struct StatusView: View {
                 .keyboardShortcut(",", modifiers: .command)
                 .help("Open mrk Settings: app preferences, macOS defaults, login items and the Dock")
             Button("mrk-menu") { model.run("mrk-menu", confirm: false) }
-                .help("Open the mrk-menu launcher in a terminal")
+                .help("Open the mrk-menu launcher in Dipstick's console")
             Button("Quit") { NSApplication.shared.terminate(nil) }
         }
         .controlSize(.small)
@@ -269,10 +269,9 @@ private struct FixButton: View {
 
     private var inBarkeep: Bool { model.opensInBarkeep(command) }
     private var route: FixRoute? { inBarkeep ? nil : FixRoute.route(for: command) }
-    private var inTerminal: Bool { model.needsTerminal(command) }
     /// The console takes one command at a time, and waits for a pane's
     /// decision.
-    private var waiting: Bool { !inBarkeep && route == nil && !inTerminal && model.isBusy }
+    private var waiting: Bool { !inBarkeep && route == nil && model.isBusy }
 
     var body: some View {
         Button {
@@ -299,7 +298,6 @@ private struct FixButton: View {
         .help(inBarkeep ? "Open Barkeep's Untracked list, which adds, adopts or ignores each package with sync, in place of \(command)"
               : route.map { "Open \($0.pane.title) in mrk Settings, which shows what \(command) would change" }
               ?? (waiting ? "A command is running in the console, or a pane is making a change"
-                  : inTerminal ? "Run \(command) in a terminal: it draws a full-screen picker"
                   : "Run \(command) in Dipstick's console"))
     }
 }

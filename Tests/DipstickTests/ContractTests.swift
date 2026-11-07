@@ -15,8 +15,9 @@ final class ContractTests: XCTestCase {
         .loginItemsAdd("-A"), .loginItemsIgnore("-A"), .loginItemsRemove("-A"), .dockCheck,
     ]
 
-    /// A contract with each script Dipstick runs, and the options given, and
-    /// the terminal targets when given.
+    /// A contract with each script Dipstick runs, and the options given. A
+    /// later mrk's `terminal` list, which Dipstick no longer reads, comes
+    /// with `terminal`.
     static func contract(version: Int = 1, defaults: [String] = ["--check", "--with-trackpad", "--skip", "--unskip", "--key", "--revert"],
                          loginItems: [String] = ["--check", "--add", "--ignore", "--remove"],
                          equals: [String] = ["--add", "--ignore", "--remove"],
@@ -67,6 +68,15 @@ final class ContractTests: XCTestCase {
         let none = try MrkContract.decode(Data(#"{"contract": 1, "scripts": {}}"#.utf8))
         XCTAssertNil(none.missing(.dockCheck), "a contract that does not name the script says nothing about it")
         XCTAssertTrue(try MrkContract.decode(Data(Self.contract(version: 2).utf8)).isNewer)
+    }
+
+    /// mrk-contract's `terminal` list, from sevmorris/mrk#142, named the Make
+    /// targets that needed Terminal. The console draws a full screen now, so
+    /// Dipstick reads no further than the options, with or without it.
+    func testTheTerminalListIsNotNeeded() throws {
+        let listed = try MrkContract.decode(Data(Self.contract(terminal: ["brew", "sync"]).utf8))
+        let unlisted = try MrkContract.decode(Data(Self.contract().utf8))
+        XCTAssertEqual(listed, unlisted)
     }
 
     /// An option the contract does not list: refused before the script runs,

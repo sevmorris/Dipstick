@@ -3,9 +3,9 @@ import AppKit
 /// Barkeep's Untracked list, which makes the fix for a package that the
 /// Brewfile lacks in a window: each package is added, adopted or ignored with
 /// mrk's sync, and from Barkeep 1.16.0 committed and pushed. The fix itself,
-/// `make sync ARGS=--push`, starts sync's full-screen picker in a terminal.
+/// `make sync ARGS=--push`, starts sync's full-screen picker in the console.
 /// Barkeep 1.17.0 and later open the list from `barkeep://untracked`; with an
-/// earlier Barkeep, or none, the fix runs in a terminal as before.
+/// earlier Barkeep, or none, the fix runs in the console as before.
 ///
 /// The link goes to the installed Barkeep by path, not to whichever app
 /// LaunchServices picks: a build in Xcode's DerivedData declares the link too,
@@ -18,7 +18,7 @@ enum BarkeepLink {
     /// Whether Barkeep makes COMMAND's fix: `make sync`, by its Make target,
     /// as FixRoute finds the fixes a pane makes.
     static func makes(_ command: String) -> Bool {
-        TerminalLauncher.makeTarget(of: command) == "sync"
+        FixRoute.makeTarget(of: command) == "sync"
     }
 
     /// The first of HANDLERS, the apps that open the link, that is Barkeep

@@ -2,151 +2,6 @@ import AppKit
 import XCTest
 @testable import Dipstick
 
-final class TerminalScreenTests: XCTestCase {
-    private func screen(_ bytes: String) -> TerminalScreen {
-        var screen = TerminalScreen()
-        screen.feed(bytes)
-        return screen
-    }
-
-    func testLinesEndAtANewlineAndTheCursorLineIsLast() {
-        let s = screen("one\r\ntwo\r\nthr")
-        XCTAssertEqual(s.lines.map { $0.map(\.text).joined() }, ["one", "two"])
-        XCTAssertEqual(s.text, "one\ntwo\nthr")
-        XCTAssertEqual(s.cursorOffset, 3)
-        XCTAssertFalse(s.atLineStart)
-        XCTAssertTrue(screen("done\r\n").atLineStart)
-    }
-
-    /// git's progress: each count writes over the last.
-    func testACarriageReturnWritesOverTheLine() {
-        XCTAssertEqual(screen("Counting:  10%\rCounting: 100%, done.\r\n").text, "Counting: 100%, done.\n")
-        XCTAssertEqual(screen("abcdef\rXY").text, "XYcdef")
-        XCTAssertEqual(screen("abcdef\rXY").cursorOffset, 2)
-    }
-
-    /// The terminal echoes Delete as "\b \b".
-    func testTheEchoOfDeleteTakesTheCharacterOff() {
-        let s = screen("Push/commit anyway? yx\u{8} \u{8}")
-        XCTAssertEqual(s.text, "Push/commit anyway? y ")
-        XCTAssertEqual(s.cursorOffset, "Push/commit anyway? y".utf16.count)
-    }
-
-    func testEraseInLine() {
-        XCTAssertEqual(screen("abcdef\r\u{1B}[K").text, "")
-        XCTAssertEqual(screen("abcdef\u{1B}[3D\u{1B}[0K").text, "abc")
-        XCTAssertEqual(screen("abcdef\u{1B}[3D\u{1B}[1K").text, "    ef")
-        XCTAssertEqual(screen("abcdef\u{1B}[2Kxy").text, "      xy")
-    }
-
-    func testMrksColoursAreStylesAndNotText() {
-        // lib.sh's ok and warn, and section's bold blue.
-        let s = screen("\u{1B}[32m  ✓\u{1B}[0m Saved\r\n\u{1B}[1m\u{1B}[34m══ Dock setup\u{1B}[0m\r\n")
-        XCTAssertEqual(s.text, "  ✓ Saved\n══ Dock setup\n")
-        XCTAssertEqual(s.lines[0], [
-            TerminalScreen.Run(text: "  ✓", style: .init(color: 2)),
-            TerminalScreen.Run(text: " Saved", style: .init()),
-        ])
-        XCTAssertEqual(s.lines[1], [TerminalScreen.Run(text: "══ Dock setup", style: .init(bold: true, color: 4))])
-    }
-
-    func testSGRCodes() {
-        let s = screen("\u{1B}[2md\u{1B}[22;4mu\u{1B}[24;7mi\u{1B}[0;91mb\u{1B}[39mn\u{1B}[mx")
-        XCTAssertEqual(s.cursorLine, [
-            TerminalScreen.Run(text: "d", style: .init(dim: true)),
-            TerminalScreen.Run(text: "u", style: .init(underline: true)),
-            TerminalScreen.Run(text: "i", style: .init(inverse: true)),
-            TerminalScreen.Run(text: "b", style: .init(color: 9)),
-            TerminalScreen.Run(text: "nx", style: .init()),
-        ])
-    }
-
-    /// An extended colour's arguments are not codes of their own: 38;5;1 is
-    /// colour 1, not bold.
-    func testAnExtendedColoursArgumentsAreSkipped() {
-        XCTAssertEqual(screen("\u{1B}[38;5;1mx").cursorLine.first?.style, .init(color: 1))
-        XCTAssertEqual(screen("\u{1B}[38;2;1;2;4mx").cursorLine.first?.style, .init())
-        XCTAssertEqual(screen("\u{1B}[38;5;200mx").cursorLine.first?.style, .init())
-    }
-
-    func testOtherSequencesAreTakenOutWhole() {
-        // A window title, the cursor hidden and shown, a character set, a move up.
-        let s = screen("\u{1B}]0;title\u{7}a\u{1B}[?25lb\u{1B}[?25h\u{1B}(Bc\u{1B}[2Ad\u{1B}]8;;http://x\u{1B}\\e")
-        XCTAssertEqual(s.text, "abcde")
-    }
-
-    func testATabGoesToTheNextStop() {
-        let s = screen("ab\tc")
-        XCTAssertEqual(s.text, "ab      c")
-        let t = screen("ab\t")
-        XCTAssertEqual(t.cursorOffset, 8)
-        XCTAssertEqual(t.text, "ab      ")
-    }
-
-    /// A character can arrive split across two reads.
-    func testACharacterSplitAcrossFeeds() {
-        var s = TerminalScreen()
-        let bytes = Array("✓ ok".utf8)
-        s.feed(Array(bytes[0..<2]))
-        s.feed(Array(bytes[2...]))
-        XCTAssertEqual(s.text, "✓ ok")
-        XCTAssertEqual(s.cursorOffset, 4)
-    }
-
-    func testBrokenUTF8IsAReplacement() {
-        var s = TerminalScreen()
-        s.feed([0x61, 0xE2, 0x9C, 0x62, 0xFF, 0x63])
-        XCTAssertEqual(s.text, "a\u{FFFD}b\u{FFFD}c")
-    }
-
-    func testEachFeedIsANewRevision() {
-        var s = TerminalScreen()
-        let first = s.revision
-        s.feed("x")
-        XCTAssertNotEqual(s.revision, first)
-    }
-}
-
-final class ConsoleKeysTests: XCTestCase {
-    private func bytes(_ characters: String?, keyCode: UInt16 = 0, _ modifiers: NSEvent.ModifierFlags = []) -> [UInt8]? {
-        ConsoleKeys.bytes(characters: characters, keyCode: keyCode, modifiers: modifiers)
-    }
-
-    func testTypingAndTheEditingKeys() {
-        XCTAssertEqual(bytes("y"), [0x79])
-        XCTAssertEqual(bytes("é"), Array("é".utf8))
-        XCTAssertEqual(bytes("\r", keyCode: 36), [0x0D])
-        XCTAssertEqual(bytes("\u{7F}", keyCode: 51), [0x7F])
-        XCTAssertEqual(bytes("\t", keyCode: 48), [0x09])
-    }
-
-    /// The keypad's Enter is Return, not the ⌃C AppKit types for it.
-    func testKeypadEnterIsReturn() {
-        XCTAssertEqual(bytes("\u{3}", keyCode: 76), [0x0D])
-    }
-
-    func testControlKeysOnlyWithControlHeld() {
-        XCTAssertEqual(bytes("\u{3}", keyCode: 8, .control), [0x03])
-        XCTAssertEqual(bytes("\u{4}", keyCode: 2, .control), [0x04])
-        XCTAssertNil(bytes("\u{1B}", keyCode: 53))
-    }
-
-    /// ⌃Z and ⌃Y would suspend the command with nothing to start it again.
-    func testNothingSuspends() {
-        XCTAssertNil(bytes("\u{1A}", keyCode: 6, .control))
-        XCTAssertNil(bytes("\u{19}", keyCode: 16, .control))
-        XCTAssertNil(bytes("\u{19}", keyCode: 48, .shift))
-    }
-
-    func testTheAppKeepsCommandAndTheArrows() {
-        XCTAssertNil(bytes("c", keyCode: 8, .command))
-        XCTAssertNil(bytes("\u{F700}", keyCode: 126))
-        XCTAssertNil(bytes("\u{F72C}", keyCode: 116))
-        XCTAssertNil(bytes(""))
-        XCTAssertNil(bytes(nil))
-    }
-}
-
 final class PseudoTerminalTests: XCTestCase {
     private var scratch: URL!
 
@@ -268,7 +123,7 @@ final class PseudoTerminalTests: XCTestCase {
 @MainActor
 final class ConsoleModelTests: XCTestCase {
     /// A fix in the console runs in the checkout with the login shell's
-    /// environment and MRK_ROOT, as the .command file did, and then mrk-status
+    /// environment and MRK_ROOT, on an xterm-256color, and then mrk-status
     /// runs again.
     func testTheConsoleRunsTheFixThenMrkStatusAgain() async throws {
         let stub = try StubMrk()
@@ -281,7 +136,7 @@ final class ConsoleModelTests: XCTestCase {
         XCTAssertEqual(session.state, .exited(0))
         let text = session.screen.text
         XCTAssertTrue(text.hasPrefix("$ make pull\n"), text)
-        XCTAssertTrue(text.contains("pulled term=dumb root=\(stub.root.path)\n\(stub.realRoot)\n"), text)
+        XCTAssertTrue(text.contains("pulled term=xterm-256color root=\(stub.root.path)\n\(stub.realRoot)\n"), text)
         XCTAssertTrue(text.hasSuffix("[exited 0]"), text)
         XCTAssertEqual(stub.calls, ["--json"])
         XCTAssertEqual(model.report?.summary, "1 error")
@@ -360,9 +215,111 @@ final class ConsoleModelTests: XCTestCase {
         XCTAssertEqual(env["PATH"], "/opt/homebrew/bin:/usr/bin")
         XCTAssertEqual(env["HOME"], "/Users/x")
         XCTAssertEqual(env["MRK_ROOT"], "/Users/x/mrk")
-        XCTAssertEqual(env["TERM"], "dumb")
+        XCTAssertEqual(env["TERM"], "xterm-256color")
         XCTAssertEqual(env["PAGER"], "cat")
         XCTAssertEqual(env["GIT_PAGER"], "cat")
         XCTAssertNil(env["COLUMNS"])
+        let fromTerminal = StatusModel.consoleEnvironment(
+            ["TERM_PROGRAM": "Apple_Terminal", "TERM_PROGRAM_VERSION": "466", "TERM_SESSION_ID": "x", "COLORTERM": "truecolor"],
+            root: "/Users/x/mrk")
+        XCTAssertNil(fromTerminal["TERM_PROGRAM"], "the console is not the terminal the shell was asked from")
+        XCTAssertNil(fromTerminal["TERM_PROGRAM_VERSION"])
+        XCTAssertNil(fromTerminal["TERM_SESSION_ID"])
+        XCTAssertNil(fromTerminal["COLORTERM"])
+    }
+}
+
+/// The console as a terminal: what it answers, its size, and a real picker.
+@MainActor
+final class ConsoleTerminalTests: XCTestCase {
+    private var scratch: URL!
+
+    override func setUpWithError() throws {
+        scratch = FileManager.default.temporaryDirectory
+            .appendingPathComponent("DipstickTests-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+    }
+
+    override func tearDownWithError() throws {
+        try? FileManager.default.removeItem(at: scratch)
+    }
+
+    private var environment: [String: String] {
+        ["PATH": "/usr/bin:/bin", "TERM": "xterm-256color", "HOME": scratch.path]
+    }
+
+    private func wait(for condition: () -> Bool, _ what: String) async throws {
+        let deadline = Date().addingTimeInterval(10)
+        while !condition() {
+            guard Date() < deadline else { return XCTFail("waited 10 s for \(what)") }
+            try await Task.sleep(for: .milliseconds(20))
+        }
+    }
+
+    /// A program that asks where the cursor is gets the answer from the
+    /// console, typed at its terminal, as termenv asks before it draws.
+    func testTheConsoleAnswersWhatTheProgramAsks() async throws {
+        try """
+        stty -icanon -echo min 1
+        printf '\\033[6n'
+        IFS= read -r -d R reply
+        stty sane
+        print -r -- "reply=${reply#?}"
+        """.write(to: scratch.appendingPathComponent("probe.zsh"), atomically: true, encoding: .utf8)
+        let session = ConsoleSession(command: "zsh -f ./probe.zsh")
+
+        await session.run(environment: environment, directory: scratch.path)
+
+        XCTAssertEqual(session.state, .exited(0))
+        // The command's own line is row 1, so the cursor was on row 2.
+        XCTAssertTrue(session.screen.text.contains("reply=[2;1\n"), session.screen.text)
+    }
+
+    /// The terminal is as big as the console's screen when the command
+    /// starts, and a change while it runs reaches it as SIGWINCH.
+    func testTheTerminalIsTheScreensSizeAndHearsAChange() async throws {
+        let session = ConsoleSession(
+            command: #"stty size; trap 'stty size; exit 0' WINCH; print ready; while :; do sleep 0.05; done"#)
+        session.resize(columns: 100, rows: 30)
+        XCTAssertEqual(session.screen.columns, 100)
+
+        let run = Task { await session.run(environment: environment, directory: scratch.path) }
+        // At the start of a line: the command's own line has "print ready".
+        try await wait(for: { session.screen.text.contains("\nready") }, "ready")
+        session.resize(columns: 120, rows: 40)
+        let deadline = Task {
+            try await Task.sleep(for: .seconds(10))
+            XCTFail("no SIGWINCH in 10 s")
+            for _ in 0..<3 { session.stop() }
+        }
+        await run.value
+        deadline.cancel()
+
+        let text = session.screen.text
+        XCTAssertTrue(text.contains("30 100\nready\n40 120\n"), text)
+        XCTAssertEqual(session.state, .exited(0))
+    }
+
+    /// gum choose, as sync and sync-login-items start it: bubbletea's inline
+    /// picker draws, the arrow keys move it, Return picks, and the picker
+    /// goes, leaving what was picked.
+    func testGumChooseDrawsAndTakesTheArrows() async throws {
+        let gum = "/opt/homebrew/bin/gum"
+        try XCTSkipUnless(FileManager.default.isExecutableFile(atPath: gum), "gum is not installed")
+        let session = ConsoleSession(command: "\(gum) choose one two three")
+        let run = Task { await session.run(environment: environment, directory: scratch.path) }
+
+        try await wait(for: { session.screen.text.contains("> one") }, "gum to draw")
+        let down = try XCTUnwrap(ConsoleKeys.bytes(characters: "\u{F701}", keyCode: 125, modifiers: [],
+                                                   modes: .init(applicationCursor: session.screen.applicationCursorKeys)))
+        session.type(down)
+        try await wait(for: { session.screen.text.contains("> two") }, "the cursor to move")
+        session.type([0x0D])
+        await run.value
+
+        XCTAssertEqual(session.state, .exited(0))
+        let text = session.screen.text
+        XCTAssertFalse(text.contains("Choose"), "the picker is gone: \(text)")
+        XCTAssertTrue(text.hasSuffix("three\ntwo\n[exited 0]"), text)
     }
 }

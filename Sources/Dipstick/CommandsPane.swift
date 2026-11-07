@@ -1,8 +1,8 @@
 import SwiftUI
 
 /// mrk-menu's commands, in its groups, from `mrk-menu --json`. Each row runs
-/// its command exactly as it shows it, in the checkout, as mrk-menu does: in
-/// Dipstick's console, or in a terminal for the ones the list marks.
+/// its command exactly as it shows it, in the checkout, as mrk-menu does, in
+/// Dipstick's console.
 struct CommandsPane: View {
     @Bindable var model: SettingsModel
 
@@ -12,7 +12,7 @@ struct CommandsPane: View {
         @Bindable var commands = model.commands
         VStack(spacing: 0) {
             PaneNote(text: "mrk-menu's commands, from mrk-menu --json. Each runs exactly as shown, in the mrk checkout, "
-                     + "after it asks: in Dipstick's console, or in Terminal where it says so. "
+                     + "in Dipstick's console, after it asks. "
                      + "Unlike a fix, a command here never opens a pane or Barkeep instead.")
             Divider()
             PhaseView(phase: commands.phase, retry: commands.load) {
@@ -46,7 +46,7 @@ struct CommandsPane: View {
     }
 }
 
-/// One command: its line, what it does, where it runs, and Run….
+/// One command: its line, what it does, and Run….
 private struct CommandRow: View {
     let command: CommandCatalog.Command
     let busy: Bool
@@ -69,16 +69,9 @@ private struct CommandRow: View {
                 Badge(text: "asks for “\(command.typeToConfirm)”", color: .red)
                     .help("Runs only after you type \(command.typeToConfirm), as mrk-menu asks")
             }
-            if command.terminal {
-                Badge(text: "Terminal", color: .blue)
-                    .help("Runs in a terminal of its own: it can show a picker the console cannot draw, "
-                          + "or it must not run inside Dipstick")
-            }
             Button("Run…", action: run)
                 .disabled(busy)
-                .help(command.terminal
-                      ? "Run \(command.command) in Terminal, in the mrk checkout"
-                      : "Run \(command.command) in Dipstick's console, in the mrk checkout")
+                .help("Run \(command.command) in Dipstick's console, in the mrk checkout")
         }
         .padding(.vertical, 2)
     }
