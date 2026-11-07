@@ -86,6 +86,15 @@ struct Line: Decodable, Sendable, Equatable {
     let text: String
     /// This line's own fix, shown beside it, or "".
     let fix: String
+    /// The macOS permission the app that runs mrk-status needs before it can
+    /// check what the line is about: "full-disk-access", or "" (or absent,
+    /// from an mrk-status before sevmorris/mrk#159). A permission is the
+    /// app's to be given, so it is never a fix.
+    var privacy: String? = nil
+
+    /// The line says Dipstick cannot check this without Full Disk Access, as
+    /// Time Machine's settings, which macOS keeps from an app without it.
+    var needsFullDiskAccess: Bool { privacy == "full-disk-access" }
 
     /// How many levels the text is indented, at two spaces a level.
     var indent: Int {

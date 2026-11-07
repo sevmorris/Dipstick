@@ -58,6 +58,29 @@ final class ReportTests: XCTestCase {
         XCTAssertEqual(report.panels[3].lines, [])
     }
 
+    /// A line mrk-status cannot check without Full Disk Access says so in
+    /// `privacy` (sevmorris/mrk#159), and the menu bar shows a button to the
+    /// pane. An mrk-status from before has no such key, and its lines read as
+    /// needing nothing; so does a word this Dipstick does not know.
+    func testALineCanNeedFullDiskAccess() throws {
+        let json = #"""
+        {"schema": 1, "severity": "warn", "summary": "1 warning", "panels": [
+          {"name": "Time Machine Backups", "severity": "warn", "fix": "", "lines": [
+            {"severity": "warn", "text": "Cannot read Time Machine's settings without Full Disk Access for the app that runs this",
+             "fix": "", "privacy": "full-disk-access"},
+            {"severity": "ok", "text": "x", "fix": "", "privacy": ""},
+            {"severity": "ok", "text": "y", "fix": "", "privacy": "camera"}
+          ]}
+        ]}
+        """#
+        let lines = try StatusReport.decode(Data(json.utf8)).panels[0].lines
+        XCTAssertEqual(lines.map(\.needsFullDiskAccess), [true, false, false])
+        XCTAssertEqual(lines[0].privacy, "full-disk-access")
+        let older = try StatusReport.decode(Data(sampleReport.utf8))
+        XCTAssertNil(older.panels[2].lines[0].privacy)
+        XCTAssertFalse(older.panels[2].lines[0].needsFullDiskAccess)
+    }
+
     func testAnUnknownSeverityReadsAsInfo() throws {
         let json = #"{"schema":1,"severity":"catastrophic","summary":"x","panels":[]}"#
         XCTAssertEqual(try StatusReport.decode(Data(json.utf8)).severity, .info)

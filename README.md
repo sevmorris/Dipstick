@@ -206,6 +206,10 @@ macOS asks about Dipstick, not Terminal.
   those permissions, `defaults.sh --check` cannot read those keys, and reports
   them as `noaccess` ([sevmorris/mrk#131](https://github.com/sevmorris/mrk/pull/131)).
   The Defaults pane shows each with a lock and **Open Full Disk Access…**.
+  Time Machine's settings, in `/Library/Preferences`, need it too: without it
+  the menu bar's Time Machine panel says it cannot read them, with a **Full
+  Disk Access…** button beside the line, as does any line mrk-status marks
+  with `privacy` ([sevmorris/mrk#159](https://github.com/sevmorris/mrk/pull/159)).
   macOS has no prompt for this permission: turn Dipstick on in System Settings
   → Privacy & Security → Full Disk Access, and let macOS quit and reopen it.
 - **App Management.** `brew upgrade` replaces apps in /Applications, which can
