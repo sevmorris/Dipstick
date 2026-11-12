@@ -114,7 +114,7 @@ struct DipstickApp: App {
         } label: {
             // The label is on screen from launch, so its task starts the
             // refresh loop before the menu is ever opened.
-            Image(systemName: appDelegate.model.symbolName)
+            Image(systemName: appDelegate.model.menuBarSymbolName)
                 .task {
                     if let dir = Snapshot.directory(in: CommandLine.arguments) {
                         let written = await Snapshot.write(model: appDelegate.model, to: dir)

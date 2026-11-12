@@ -165,4 +165,41 @@ final class ReportTests: XCTestCase {
         let json = #"{"schema":1,"severity":"warn","summary":"x","panels":[{"name":"P","severity":"warn","fix":"","lines":[{"severity":"catastrophic","text":"t","fix":""}]}]}"#
         XCTAssertEqual(try StatusReport.decode(Data(json.utf8)).problems, [])
     }
+
+    // The Upkeep panel as mrk-status writes it when Homebrew has updates.
+    private func upkeep(_ extra: [Line] = []) -> Panel {
+        Panel(name: "Upkeep", severity: .warn, fix: "make update ARGS=--formulae", lines: [
+            Line(severity: .ok, text: "~/mrk is level with origin/main", fix: ""),
+            Line(severity: .warn, text: "1 Homebrew formula outdated, fetched 1 hour ago: little-cms2",
+                 fix: "make update ARGS=--formulae"),
+            Line(severity: .warn, text: "4 Homebrew casks outdated: google-chrome, signal",
+                 fix: "make update ARGS=--casks"),
+        ] + extra)
+    }
+
+    func testOutdatedPackagesAloneLeaveTheMenuBarClear() {
+        let report = StatusReport(schema: 1, severity: .warn, summary: "2 warnings", panels: [
+            upkeep(),
+            Panel(name: "Installation", severity: .ok, fix: "", lines: []),
+        ])
+        XCTAssertEqual(report.menuBarSeverity, .ok)
+        // The window still lists them.
+        XCTAssertEqual(report.problems.first?.lines.count, 2)
+    }
+
+    func testOtherWarningsStillReachTheMenuBar() {
+        let stale = Line(severity: .warn, text: "Homebrew last fetched 3 days ago: the list above can miss an update",
+                         fix: "make update")
+        XCTAssertEqual(StatusReport(schema: 1, severity: .warn, summary: "", panels: [upkeep([stale])])
+            .menuBarSeverity, .warn)
+        let backups = Panel(name: "Time Machine Backups", severity: .error, fix: "", lines: [
+            Line(severity: .error, text: "Last backup 9 days ago", fix: ""),
+        ])
+        XCTAssertEqual(StatusReport(schema: 1, severity: .error, summary: "", panels: [upkeep(), backups])
+            .menuBarSeverity, .error)
+    }
+
+    func testTheMenuBarFollowsTheHeaderWithoutOutdatedPackages() throws {
+        XCTAssertEqual(try StatusReport.decode(Data(sampleReport.utf8)).menuBarSeverity, .error)
+    }
 }

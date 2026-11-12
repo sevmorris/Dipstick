@@ -24,6 +24,10 @@ The icon shows the worst result:
 | ✗ octagon | At least one error |
 | ? circle | `mrk-status` did not run, or gave no report |
 
+Outdated Homebrew formulae and casks are left out of the icon: something is
+outdated nearly every day, so on their own they leave it a ✓. The window still
+lists them as warnings, with their fixes, and its verdict counts them.
+
 Click the icon to open the window. Under the verdict, the window lists each
 warning and error, under the name of its panel, with its detail lines and its
 fix. Below that are the four panels, closed. Click a panel to see all its
