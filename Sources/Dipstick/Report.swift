@@ -14,6 +14,16 @@ enum Severity: String, Decodable, Sendable {
 
     /// A warning or an error: a line the window lists under the verdict.
     var isProblem: Bool { self == .warn || self == .error }
+
+    /// How bad it is, for taking the worst of several.
+    var rank: Int {
+        switch self {
+        case .ok: return 0
+        case .info: return 1
+        case .warn: return 2
+        case .error: return 3
+        }
+    }
 }
 
 /// The `mrk-status --json` document: the dashboard's panels, as mrk-status
@@ -41,6 +51,22 @@ struct StatusReport: Decodable, Sendable, Equatable {
     static func schema(of data: Data) -> Int? {
         struct Schema: Decodable { let schema: Int }
         return try? JSONDecoder().decode(Schema.self, from: data).schema
+    }
+
+    /// The menu bar icon's verdict: the header's, but leaving out the lines
+    /// for outdated Homebrew packages (`Line.isRoutineUpdate`). Something is
+    /// outdated nearly every day, and the icon is for what needs attention;
+    /// the window still lists them as warnings. A panel with no such line
+    /// keeps its own severity.
+    var menuBarSeverity: Severity {
+        guard severity.isProblem else { return severity }
+        let worst = panels.map { panel -> Severity in
+            guard panel.lines.contains(where: \.isRoutineUpdate) else { return panel.severity }
+            return panel.lines.filter { !$0.isRoutineUpdate }.map(\.severity)
+                .max { $0.rank < $1.rank } ?? .ok
+        }.max { $0.rank < $1.rank } ?? .ok
+        // Left with only info lines, the icon reads as clear.
+        return worst.isProblem ? worst : .ok
     }
 
     /// What is wrong, for the window to list under the verdict: each panel
@@ -95,6 +121,19 @@ struct Line: Decodable, Sendable, Equatable {
     /// The line says Dipstick cannot check this without Full Disk Access, as
     /// Time Machine's settings, which macOS keeps from an app without it.
     var needsFullDiskAccess: Bool { privacy == "full-disk-access" }
+
+    /// A line for outdated Homebrew packages, the formulae's or the casks',
+    /// found by the fix mrk-status gives each (fixUpdateFormulae and
+    /// fixUpdateCasks in tools/mrk-status/daily.go). Plain `make update`, for a
+    /// list too long unfetched to trust, is not one.
+    var isRoutineUpdate: Bool {
+        Self.routineUpdateFixes.contains(fix)
+    }
+
+    static let routineUpdateFixes: Set<String> = [
+        "make update ARGS=--formulae",
+        "make update ARGS=--casks",
+    ]
 
     /// How many levels the text is indented, at two spaces a level.
     var indent: Int {

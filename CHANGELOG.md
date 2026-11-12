@@ -4,6 +4,11 @@ All notable changes to Dipstick are documented here. Every released version has 
 
 Write a version's entry before releasing it, and put the same prose in `release-notes/v<version>.md`: `release.sh` publishes that file as the release's notes, and stops before building anything when it is absent.
 
+## [Unreleased]
+
+**Changed**
+- **Outdated Homebrew packages no longer turn the menu bar icon into a warning.** Something is outdated nearly every day, so the triangle stopped meaning anything. The icon now leaves out mrk-status's lines for outdated formulae and casks; the window still lists them as warnings, with their **make update** buttons. Every other warning or error still shows in the menu bar, including a Homebrew list too long unfetched to trust.
+
 ## [0.11] — 2026-11-07
 
 **Added**

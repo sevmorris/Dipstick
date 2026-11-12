@@ -106,9 +106,15 @@ final class StatusModel {
 
     /// The menu bar icon. A report that could not be read is its own state,
     /// apart from a report that says something is wrong.
-    var symbolName: String {
+    var symbolName: String { symbolName(for: report?.severity) }
+
+    /// The icon in the menu bar itself, which outdated Homebrew packages alone
+    /// do not turn into a warning (`StatusReport.menuBarSeverity`).
+    var menuBarSymbolName: String { symbolName(for: report?.menuBarSeverity) }
+
+    private func symbolName(for severity: Severity?) -> String {
         if error != nil, report == nil { return "questionmark.circle" }
-        switch report?.severity {
+        switch severity {
         case nil: return "gauge.with.dots.needle.bottom.50percent"
         case .ok, .info: return "checkmark.circle"
         case .warn: return "exclamationmark.triangle"
