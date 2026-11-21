@@ -6,8 +6,13 @@ Write a version's entry before releasing it, and put the same prose in `release-
 
 ## [Unreleased]
 
+## [0.14] — 2026-11-20
+
 **Changed**
 - **Opening the console's Edit menu no longer reads the clipboard.** To decide whether Paste is available, Dipstick now asks only whether the clipboard holds text, rather than reading the text itself, so macOS's paste privacy rules have no reason to ask "Allow Paste?" when the menu opens or ⌘V is checked. Pasting still reads the clipboard, as it must.
+
+**Updating**
+- From 0.8, **Update and Relaunch** installs this version in place.
 
 ## [0.13] — 2026-11-13
 
