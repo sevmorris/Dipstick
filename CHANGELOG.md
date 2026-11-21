@@ -4,6 +4,11 @@ All notable changes to Dipstick are documented here. Every released version has 
 
 Write a version's entry before releasing it, and put the same prose in `release-notes/v<version>.md`: `release.sh` publishes that file as the release's notes, and stops before building anything when it is absent.
 
+## [Unreleased]
+
+**Changed**
+- **Opening the console's Edit menu no longer reads the clipboard.** To decide whether Paste is available, Dipstick now asks only whether the clipboard holds text, rather than reading the text itself, so macOS's paste privacy rules have no reason to ask "Allow Paste?" when the menu opens or ⌘V is checked. Pasting still reads the clipboard, as it must.
+
 ## [0.13] — 2026-11-13
 
 Updating is sturdier. Most of this takes effect from the update after this one, because the version you have now installs this one.

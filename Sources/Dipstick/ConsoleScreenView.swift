@@ -486,7 +486,11 @@ final class ConsoleTextView: NSTextView {
 
     override func validateUserInterfaceItem(_ item: NSValidatedUserInterfaceItem) -> Bool {
         if item.action == #selector(paste(_:)) {
-            return onType != nil && NSPasteboard.general.string(forType: .string) != nil
+            // Ask only whether the clipboard holds text. Reading it here would
+            // be a programmatic read, which macOS's paste privacy rules can
+            // answer with an "Allow Paste?" prompt each time the Edit menu
+            // or ⌘V is validated; paste(_:) reads it when the user pastes.
+            return onType != nil && NSPasteboard.general.availableType(from: [.string]) != nil
         }
         return super.validateUserInterfaceItem(item)
     }
