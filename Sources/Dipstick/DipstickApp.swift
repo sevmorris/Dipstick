@@ -59,8 +59,17 @@ extension UserDefaults {
             scratch = nil
         }
         guard let scratch else { return .standard }
-        return UserDefaults(suiteName: FileManager.default.temporaryDirectory
-            .appendingPathComponent(scratch).path)!
+        // Either scratch file outlives its run, at the same path each time, and
+        // a suite named by a path keeps reading the values its file held when
+        // it was loaded: setting or removing such a key reaches the file but
+        // not `string(forKey:)` or @AppStorage (macOS 27.2, 2026-11-23). A run
+        // stopped part-way leaves its keys behind, such as the consoleStyle a
+        // console test sets, and every later run would read those whatever it
+        // sets. Deleting the file before the suite first reads it starts every
+        // run clean, as on a CI runner.
+        let path = FileManager.default.temporaryDirectory.appendingPathComponent(scratch).path
+        try? FileManager.default.removeItem(atPath: path + ".plist")
+        return UserDefaults(suiteName: path)!
     }()
 }
 
