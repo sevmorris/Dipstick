@@ -22,6 +22,11 @@ struct FixRoute: Equatable, Sendable {
     var withTrackpad = false
 
     static func route(for command: String) -> FixRoute? {
+        // mrk-status's Default Apps fix runs the script itself: mrk has no
+        // Make target for it.
+        if command.split(whereSeparator: \.isWhitespace).map(String.init) == ["scripts/default-apps", "--apply"] {
+            return FixRoute(pane: .defaultApps)
+        }
         switch makeTarget(of: command) {
         case "snapshot-prefs": return FixRoute(pane: .preferences)
         case "sync-login-items": return FixRoute(pane: .loginItems)

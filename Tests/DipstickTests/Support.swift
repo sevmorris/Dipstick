@@ -35,7 +35,8 @@ final class StubMrk {
             try FileManager.default.createDirectory(at: root.appendingPathComponent(sub),
                                                     withIntermediateDirectories: true)
         }
-        for script in MrkCheckout.scripts { try stub(script) }
+        // scripts/default-apps too, which a checkout from before it lacks.
+        for script in MrkCheckout.scripts + ["scripts/default-apps"] { try stub(script) }
         for file in ["config/defaults.tsv", "docs/defaults/descriptions.tsv", "config/app-prefs.tsv",
                      "config/login-items.txt", "config/dock.txt"] {
             try write(file, "")

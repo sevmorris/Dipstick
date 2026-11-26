@@ -3,11 +3,11 @@ import Foundation
 // mrk Settings, Dipstick's window, is a window over mrk's own scripts. It
 // reads the lists in config/ and asks the scripts' check modes what they
 // find, and every decision goes back through a script's own flag:
-// sync-login-items --add, --remove and --ignore, and defaults.sh --skip,
-// --unskip, --key and --revert. The one file it writes itself is
+// sync-login-items --add, --remove and --ignore, defaults.sh --skip,
+// --unskip, --key and --revert, and default-apps --snapshot. The one file it writes itself is
 // config/dock.txt, the plain list dock-setup reads, as Barkeep writes
 // tools/picker/descriptions.tsv. What changes the Mac (make defaults, make
-// dock) or commits and pushes (make snapshot-prefs) runs in Dipstick's
+// dock, default-apps --apply) or commits and pushes (make snapshot-prefs) runs in Dipstick's
 // console, on a terminal of its own, with its own prompts and output in view.
 // Dipstick never commits by itself: mrk-push and pushall do that, with their
 // secret scan and gates, and the Unrecorded panel shows what is waiting.
@@ -33,9 +33,12 @@ struct MrkCheckout: Equatable, Sendable {
     var appPrefs: URL             { file("config/app-prefs.tsv") }
     var loginItems: URL           { file("config/login-items.txt") }
     var dockList: URL             { file("config/dock.txt") }
+    var defaultApps: URL          { file("config/default-apps.tsv") }
 
     /// The scripts the panes run. A checkout without them is too old for
-    /// Dipstick, or no checkout at all.
+    /// Dipstick, or no checkout at all. scripts/default-apps is not one: it
+    /// came with mrk on 2026-11-25 (sevmorris/mrk#175), and an mrk from before
+    /// it keeps every other pane; the Default Apps pane says to pull.
     static let scripts = ["scripts/snapshot-prefs", "scripts/defaults.sh",
                           "scripts/sync-login-items", "scripts/dock-setup"]
 
@@ -77,6 +80,12 @@ enum MrkCommand: Equatable, Sendable {
     /// mrk-menu's commands, as JSON: the Commands pane's list. mrk-menu is a
     /// Go binary that make build-tools writes into bin/.
     case menuList
+    /// Each type of config/default-apps.tsv: the type, the listed app, the
+    /// app that opens it now, and set|differs|none|noapp|unknown.
+    case defaultAppsCheck
+    /// Record in config/default-apps.tsv each type given to an app by hand,
+    /// from Launch Services' choices. It commits nothing.
+    case defaultAppsSnapshot
 
     var script: String {
         switch self {
@@ -86,6 +95,7 @@ enum MrkCommand: Equatable, Sendable {
             return "scripts/sync-login-items"
         case .dockCheck: return "scripts/dock-setup"
         case .menuList: return "bin/mrk-menu"
+        case .defaultAppsCheck, .defaultAppsSnapshot: return "scripts/default-apps"
         }
     }
 
@@ -102,6 +112,8 @@ enum MrkCommand: Equatable, Sendable {
         case .loginItemsRemove(let name): return Self.decision("--remove", name)
         case .dockCheck: return ["--check"]
         case .menuList: return ["--json"]
+        case .defaultAppsCheck: return ["--check"]
+        case .defaultAppsSnapshot: return ["--snapshot"]
         }
     }
 
@@ -123,7 +135,8 @@ enum MrkCommand: Equatable, Sendable {
             [(option, name.hasPrefix("-"))]
         }
         switch self {
-        case .prefsCheck, .loginItemsCheck, .dockCheck: return plain("--check")
+        case .prefsCheck, .loginItemsCheck, .dockCheck, .defaultAppsCheck: return plain("--check")
+        case .defaultAppsSnapshot: return plain("--snapshot")
         case .menuList: return plain("--json")
         case .defaultsCheck(let trackpad): return trackpad ? plain("--check", "--with-trackpad") : plain("--check")
         case .defaultsOff: return plain("--skip", "--revert")
@@ -154,12 +167,16 @@ enum TerminalCommand: Equatable, Sendable {
     case snapshotPrefs
     case applyDefaults(withTrackpad: Bool)
     case applyDock
+    /// macOS asks to confirm each type in a dialog, so it runs where its
+    /// output says which type it is on. mrk has no Make target for it.
+    case applyDefaultApps
 
     var command: String {
         switch self {
         case .snapshotPrefs: return "make snapshot-prefs"
         case .applyDefaults(let trackpad): return trackpad ? "make trackpad" : "make defaults"
         case .applyDock: return "make dock"
+        case .applyDefaultApps: return "scripts/default-apps --apply"
         }
     }
 
@@ -169,6 +186,7 @@ enum TerminalCommand: Equatable, Sendable {
         case .snapshotPrefs: return .preferences
         case .applyDefaults: return .defaults
         case .applyDock: return .dock
+        case .applyDefaultApps: return .defaultApps
         }
     }
 }

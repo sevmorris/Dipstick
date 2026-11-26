@@ -13,6 +13,7 @@ final class ContractTests: XCTestCase {
         .defaultsApply([DefaultsKey(domain: "a", key: "b")]), .loginItemsCheck,
         .loginItemsAdd("A"), .loginItemsIgnore("A"), .loginItemsRemove("A"),
         .loginItemsAdd("-A"), .loginItemsIgnore("-A"), .loginItemsRemove("-A"), .dockCheck,
+        .defaultAppsCheck, .defaultAppsSnapshot,
     ]
 
     /// A contract with each script Dipstick runs, and the options given. A

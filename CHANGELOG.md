@@ -6,6 +6,12 @@ Write a version's entry before releasing it, and put the same prose in `release-
 
 ## [Unreleased]
 
+**Added**
+- **A Default Apps pane in mrk Settings.** It shows which app opens each file type and link that mrk's `config/default-apps.tsv` lists, grouped by the app the list gives it, and names the app that opens a type now when an app has taken it. **Snapshot…** records the types you gave to an app with Get Info, and **Apply…** gives each type back to its listed app in the console, where macOS asks about each one. The menu bar's Default Apps fix opens the pane. It needs mrk from 2026-11-25 (sevmorris/mrk#175); with an older mrk the pane says to run `make pull`, and the other panes work as before.
+
+**Developer**
+- `--snapshot` writes `6-defaultApps.png`, and the Commands pane and the console move to `7-commands.png` and `8-console.png`.
+
 ## [0.14] — 2026-11-20
 
 **Changed**

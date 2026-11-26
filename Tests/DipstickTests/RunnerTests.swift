@@ -64,6 +64,8 @@ final class CommandTests: XCTestCase {
         XCTAssertEqual(TerminalCommand.applyDefaults(withTrackpad: false).command, "make defaults")
         XCTAssertEqual(TerminalCommand.applyDefaults(withTrackpad: true).command, "make trackpad")
         XCTAssertEqual(TerminalCommand.applyDock.command, "make dock")
+        XCTAssertEqual(TerminalCommand.applyDefaultApps.command, "scripts/default-apps --apply")
+        XCTAssertEqual(TerminalCommand.applyDefaultApps.pane, .defaultApps)
     }
 
     func testTheCheckoutIsMrkRootOrHomeMrk() {
