@@ -18,7 +18,7 @@ enum LoadPhase: Equatable, Sendable {
 }
 
 enum Pane: String, CaseIterable, Identifiable, Sendable {
-    case preferences, defaults, loginItems, dock, commands
+    case preferences, defaults, loginItems, dock, defaultApps, commands
     var id: String { rawValue }
 
     var title: String {
@@ -27,6 +27,7 @@ enum Pane: String, CaseIterable, Identifiable, Sendable {
         case .defaults: return "macOS Defaults"
         case .loginItems: return "Login Items"
         case .dock: return "Dock"
+        case .defaultApps: return "Default Apps"
         case .commands: return "Commands"
         }
     }
@@ -37,6 +38,7 @@ enum Pane: String, CaseIterable, Identifiable, Sendable {
         case .defaults: return "gearshape.2"
         case .loginItems: return "power"
         case .dock: return "dock.rectangle"
+        case .defaultApps: return "arrow.up.forward.app"
         case .commands: return "terminal"
         }
     }
@@ -54,6 +56,7 @@ final class SettingsModel {
     let defaults: DefaultsModel
     let loginItems: LoginItemsModel
     let dock: DockModel
+    let defaultApps: DefaultAppsModel
     let commands: CommandsModel
 
     var selection: Pane? {
@@ -73,6 +76,7 @@ final class SettingsModel {
         defaults = DefaultsModel(checkout: checkout, runner: runner, store: store)
         loginItems = LoginItemsModel(checkout: checkout, runner: runner)
         dock = DockModel(checkout: checkout, runner: runner, home: home)
+        defaultApps = DefaultAppsModel(checkout: checkout, runner: runner)
         commands = CommandsModel(checkout: checkout, runner: runner)
         selection = store.string(forKey: "selectedPane").flatMap(Pane.init(rawValue:)) ?? .preferences
         // A decision changes what mrk-status reports: the Unrecorded panel's
@@ -81,6 +85,7 @@ final class SettingsModel {
         defaults.changed = changed
         loginItems.changed = changed
         dock.changed = changed
+        defaultApps.changed = changed
     }
 
     var checkoutProblem: String? {
@@ -95,13 +100,14 @@ final class SettingsModel {
         case .defaults: await defaults.load()
         case .loginItems: await loginItems.load()
         case .dock: await dock.load()
+        case .defaultApps: await defaultApps.load()
         case .commands: await commands.load()
         }
     }
 
     /// Whether a switch or a login item decision is running. The menu bar's
     /// fixes wait for it, as the panes wait for the console.
-    var isDeciding: Bool { defaults.busy != nil || loginItems.busy != nil }
+    var isDeciding: Bool { defaults.busy != nil || loginItems.busy != nil || defaultApps.busy }
 
     /// Runs a command in Dipstick's console, which reads the command's pane
     /// again, and runs mrk-status again, once it has exited. One at a time:
@@ -558,5 +564,95 @@ final class DockModel {
         }
         changed()
         await check()
+    }
+}
+
+// MARK: - Default apps
+
+/// config/default-apps.tsv, the app that opens each file type and URL scheme,
+/// against this Mac, from `default-apps --check`. Snapshot records the types
+/// given to an app by hand, through default-apps' own flag; Apply runs
+/// `default-apps --apply` in the console, where macOS asks about each type.
+@Observable @MainActor
+final class DefaultAppsModel {
+    let checkout: MrkCheckout
+    let runner: MrkRunner
+    var phase: LoadPhase = .idle
+    var checks: [DefaultAppCheck] = []
+    /// Whether default-apps --snapshot is running.
+    var busy = false
+    var decisionError: String?
+    /// What the last snapshot wrote to stderr: each change it made.
+    var snapshotLog = ""
+    /// Told after each snapshot: SettingsModel passes it on to the menu bar.
+    @ObservationIgnored var changed: @MainActor () -> Void = {}
+
+    init(checkout: MrkCheckout, runner: MrkRunner) {
+        self.checkout = checkout
+        self.runner = runner
+    }
+
+    var groups: [DefaultAppGroup] { DefaultAppGroup.group(checks) }
+    var counts: DefaultAppCounts { DefaultAppCounts(checks) }
+
+    /// What the pane's title bar says under its title.
+    var subtitle: String {
+        let c = counts
+        var text = "\(c.set) set"
+        if c.differs > 0 { text += " · \(c.differs) in another app" }
+        if c.none > 0 { text += " · \(c.none) in no app" }
+        if c.noApp > 0 { text += " · \(c.noApp) waiting" }
+        if c.unknown > 0 { text += " · \(c.unknown) unknown" }
+        return text
+    }
+
+    /// Reads the types. An mrk from before default-apps has no script, and
+    /// the pane says to pull rather than that the script could not start.
+    func load() async {
+        let command = MrkCommand.defaultAppsCheck
+        guard FileManager.default.isExecutableFile(atPath: checkout.file(command.script).path) else {
+            checks = []
+            phase = .failed("\(command.script) is not in this mrk: it is older than Dipstick. "
+                            + "Run make pull in \(checkout.root.path).")
+            return
+        }
+        if phase != .loaded { phase = .loading }
+        do {
+            let result = try await runner.run(command, in: checkout)
+            checks = DefaultAppCheck.parse(result.stdoutText)
+            phase = checks.isEmpty && MrkText.hasLines(result.stdoutText) ? .unreadable(command) : .loaded
+        } catch let error as MrkError where error.status == 1 {
+            checks = []
+            phase = .failed("default-apps refuses config/default-apps.tsv: \(error.localizedDescription)")
+        } catch {
+            checks = []
+            phase = .failed(error.localizedDescription)
+        }
+    }
+
+    /// Records in config/default-apps.tsv each type given to an app by hand,
+    /// then reads the types again. It commits nothing; mrk-push does.
+    func snapshot() async {
+        guard !busy else { return }
+        busy = true
+        defer { busy = false }
+        do {
+            let result = try await runner.run(.defaultAppsSnapshot, in: checkout)
+            snapshotLog = Self.changes(in: result.stderrText)
+            decisionError = nil
+        } catch {
+            decisionError = error.localizedDescription
+        }
+        await load()
+        changed()
+    }
+
+    /// The lines of a snapshot's stderr that say what it changed, or that it
+    /// had nothing to change, with mrk's marks and colours taken off.
+    static func changes(in stderr: String) -> String {
+        stderr.split(separator: "\n").map { MrkRunner.lastLine(of: String($0)) }
+            .filter { $0.hasPrefix("Add: ") || $0.hasPrefix("Change: ") || $0.contains("change(s) in config/default-apps.tsv")
+                || $0.hasPrefix("The list has each type") }
+            .joined(separator: "\n")
     }
 }

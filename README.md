@@ -48,6 +48,7 @@ and runs nothing until you ask:
 | `make sync-login-items ARGS=-c` | Login Items |
 | `make defaults`, `make trackpad` | macOS Defaults |
 | `make dock` | Dock |
+| `scripts/default-apps --apply` | Default Apps |
 
 Every other fix runs in Dipstick's console, the full-screen ones too:
 `make sync ARGS=--push` and `make brew` draw mrk-picker or gum there, and the
@@ -69,6 +70,7 @@ installed copy by its path, never a build of Barkeep elsewhere.
 | macOS Defaults | `defaults.sh --check [--with-trackpad]`, with each key's section and `when` from `config/defaults.tsv` and its description from `docs/defaults/descriptions.tsv` | Each key's switch turns it off with `defaults.sh --skip` and `--revert`, and on with `--unskip` and `--key`, for every domain of the setting. **Apply This Key** runs `--key` for a key that differs or is absent. **Apply All…** runs `make defaults` (or `make trackpad`) in the console, after a confirmation that names the restart of Finder, the Dock and SystemUIServer |
 | Login Items | `config/login-items.txt` and `sync-login-items --check` | **Add**, **Ignore** and **Remove** run `sync-login-items --add`, `--ignore` and `--remove` |
 | Dock | `config/dock.txt` and `dock-setup --check` | Reordering, adding and removing write `config/dock.txt`, the plain list `dock-setup` reads. **Apply…** runs `make dock` in the console, after a confirmation |
+| Default Apps | `default-apps --check`: each file type and link of `config/default-apps.tsv`, under the app the list gives it, with the app that opens it now | **Snapshot…** runs `default-apps --snapshot`, which records the types you gave to an app with Get Info. **Apply…** runs `default-apps --apply` in the console, after a confirmation, where macOS asks about each type. Needs mrk from [sevmorris/mrk#175](https://github.com/sevmorris/mrk/pull/175); an older checkout shows the pane's advice to pull |
 | Commands | `bin/mrk-menu --json`: mrk-menu's commands, in its groups and order | **Run…** runs a command exactly as the row shows it, in the checkout, in the console, after a confirmation. nuke-mrk runs only after you type `nuke`, as mrk-menu asks |
 
 **The Commands pane runs what it shows.** Unlike a menu bar fix, a command
@@ -284,9 +286,9 @@ build/Dipstick.app/Contents/MacOS/Dipstick --snapshot /tmp/dipstick-shots
 
 Dipstick runs one refresh, opens the window under its icon as a click does,
 and saves it as `1-status.png`. Then it opens mrk Settings, loads each pane
-against the real checkout, and saves `2-preferences.png` to `6-commands.png`. Last,
+against the real checkout, and saves `2-preferences.png` to `7-commands.png`. Last,
 it runs `make help` in the console, which lists mrk's Make targets and changes
-nothing, saves `7-console.png`, and quits. It runs only the read-only check
+nothing, saves `8-console.png`, and quits. It runs only the read-only check
 modes. The images are of the windows themselves, and Dipstick prints their
 sizes in points. The console's screen is Phosphor Green, whatever
 `consoleStyle` says, and Dipstick puts back any key the run wrote in its

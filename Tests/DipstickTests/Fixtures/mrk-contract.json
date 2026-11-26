@@ -22,6 +22,20 @@
         ]
       }
     },
+    "scripts/default-apps": {
+      "options": ["--check", "--apply", "--snapshot", "--dry-run", "-n", "--help", "-h"],
+      "equals": [],
+      "decisions": [],
+      "check": {
+        "options": ["--check"],
+        "fields": [
+          {"field": "type", "with": "", "words": []},
+          {"field": "app", "with": "", "words": []},
+          {"field": "current", "with": "", "words": []},
+          {"field": "state", "with": "", "words": ["set", "differs", "none", "noapp", "unknown"]}
+        ]
+      }
+    },
     "scripts/dock-setup": {
       "options": ["--dry-run", "-n", "--check", "--help", "-h"],
       "equals": [],
@@ -51,7 +65,7 @@
       }
     },
     "scripts/sync": {
-      "options": ["--dry-run", "-n", "--commit", "-c", "--prune", "-p", "--add", "--ignore", "--section", "--formula", "--cask", "--check", "--details", "--help", "-h"],
+      "options": ["--dry-run", "-n", "--commit", "-c", "--push", "--prune", "-p", "--add", "--ignore", "--section", "--formula", "--cask", "--check", "--details", "--help", "-h"],
       "equals": [],
       "decisions": [
         {"option": "--add", "values": ["NAME"]},

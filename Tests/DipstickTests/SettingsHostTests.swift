@@ -12,7 +12,11 @@ final class FixRouteTests: XCTestCase {
         XCTAssertEqual(FixRoute.route(for: "make defaults"), FixRoute(pane: .defaults))
         XCTAssertEqual(FixRoute.route(for: "make trackpad"), FixRoute(pane: .defaults, withTrackpad: true))
         XCTAssertEqual(FixRoute.route(for: "make dock"), FixRoute(pane: .dock))
+        // From mrk at 4c994c9 (sevmorris/mrk#176): Default Apps' fix, which
+        // runs the script, since mrk has no Make target for it.
+        XCTAssertEqual(FixRoute.route(for: "scripts/default-apps --apply"), FixRoute(pane: .defaultApps))
         let others = [
+            "scripts/default-apps --snapshot", "scripts/default-apps", "bin/default-apps --apply",
             "mrk-menu", "make sync ARGS=-c", "make brew", "bin/mrk-push", "bin/pushall", "make pull",
             "make update", "make updates", "make build-tools", "make dotfiles", "make tools",
             "make fix-exec", "make harden", "chsh -s /opt/homebrew/bin/zsh",
