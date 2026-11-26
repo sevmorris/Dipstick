@@ -1,7 +1,7 @@
 import SwiftUI
 import AppKit
 
-let appVersion = "0.14"
+let appVersion = "0.15"
 
 // MARK: - Launch
 
